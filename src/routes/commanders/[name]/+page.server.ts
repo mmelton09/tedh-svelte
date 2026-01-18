@@ -165,6 +165,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
   let totalPages = 1;
   let usedRpc = false;
 
+  console.log('RPC result:', { rpcError: rpcError?.message, rpcPilotsCount: rpcPilots?.length });
   if (!rpcError && rpcPilots && rpcPilots.length > 0) {
     // RPC worked - use its data
     usedRpc = true;
@@ -267,6 +268,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
     }
 
     // Filter to only entries matching this commander pair
+    console.log('Fallback: entries fetched:', entries?.length, 'commanderName:', commanderName);
     const matchingEntries = (entries || []).filter(entry => {
       const commanders = (entry.deck_commanders as any[]) || [];
       const commanderPair = commanders
@@ -275,6 +277,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
         .join(' / ');
       return commanderPair === commanderName;
     });
+    console.log('Fallback: matching entries:', matchingEntries.length);
 
     // Aggregate pilots
     const pilotMap: Record<string, any> = {};
