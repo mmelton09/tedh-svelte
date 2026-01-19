@@ -78,14 +78,6 @@ export const load: PageServerLoad = async ({ params, url }) => {
     console.error('Error fetching standings:', standingsError);
   }
 
-  // Debug: log decklist data
-  const decklistSamples = (standings || []).slice(0, 5).map(s => ({
-    standing: s.standing,
-    decklist: s.decklist,
-    hasUrl: s.decklist?.includes('http')
-  }));
-  console.log('Decklist samples:', JSON.stringify(decklistSamples, null, 2));
-
   // Get match/pairings data for this tournament
   const { data: matches } = await supabase
     .from('matches')

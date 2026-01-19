@@ -1,17 +1,8 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
-  import { onMount } from 'svelte';
 
   let { data } = $props();
-
-  // Debug: log first entry's decklist
-  $effect(() => {
-    if (data.standings?.length > 0) {
-      console.log('First entry decklist:', data.standings[0].decklist);
-      console.log('First entry keys:', Object.keys(data.standings[0]));
-    }
-  });
 
   // Expanded rows state
   let expandedRows = $state<Set<number>>(new Set());
@@ -80,10 +71,6 @@
     return null;
   }
 
-  function hasDecklist(decklist: string | null): boolean {
-    return decklist !== null && decklist.trim().length > 0;
-  }
-
   function updateMinSize(newMinSize: number) {
     const params = new URLSearchParams($page.url.searchParams);
     params.set('min_size', newMinSize.toString());
@@ -106,13 +93,6 @@
     return '';
   }
 </script>
-
-<!-- Debug output -->
-{#if data.standings?.length > 0}
-<div style="background: #333; padding: 10px; margin-bottom: 10px; font-size: 12px;">
-  DEBUG: First entry has decklist: {data.standings[0].decklist ? 'YES (' + data.standings[0].decklist.length + ' chars)' : 'NO/NULL'}
-</div>
-{/if}
 
 <!-- Tournament Navigation -->
 <div class="tournament-nav">
@@ -232,7 +212,7 @@
             {#if getDecklistUrl(entry.decklist)}
               <a href={getDecklistUrl(entry.decklist)} target="_blank" rel="noopener">📋</a>
             {:else if entry.decklist && entry.decklist.length > 0}
-              <button class="decklist-btn" title="View decklist" onclick={() => alert(entry.decklist)}>📝</button>
+              <a href="/decklist/{entry.entry_id}" target="_blank" rel="noopener">📋</a>
             {:else}
               -
             {/if}
@@ -503,17 +483,9 @@
     text-align: center;
   }
 
-  .list-cell a,
-  .list-cell .decklist-btn {
+  .list-cell a {
     font-size: 1.1rem;
     text-decoration: none;
-  }
-
-  .decklist-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0;
   }
 
   .gold {
