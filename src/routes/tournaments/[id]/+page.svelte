@@ -5,6 +5,14 @@
 
   let { data } = $props();
 
+  // Debug: log first entry's decklist
+  $effect(() => {
+    if (data.standings?.length > 0) {
+      console.log('First entry decklist:', data.standings[0].decklist);
+      console.log('First entry keys:', Object.keys(data.standings[0]));
+    }
+  });
+
   // Expanded rows state
   let expandedRows = $state<Set<number>>(new Set());
 
@@ -98,6 +106,13 @@
     return '';
   }
 </script>
+
+<!-- Debug output -->
+{#if data.standings?.length > 0}
+<div style="background: #333; padding: 10px; margin-bottom: 10px; font-size: 12px;">
+  DEBUG: First entry has decklist: {data.standings[0].decklist ? 'YES (' + data.standings[0].decklist.length + ' chars)' : 'NO/NULL'}
+</div>
+{/if}
 
 <!-- Tournament Navigation -->
 <div class="tournament-nav">
