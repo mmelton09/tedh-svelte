@@ -216,8 +216,8 @@
           <td class="list-cell" onclick={(e) => e.stopPropagation()}>
             {#if getDecklistUrl(entry.decklist)}
               <a href={getDecklistUrl(entry.decklist)} target="_blank" rel="noopener">📋</a>
-            {:else if hasDecklist(entry.decklist)}
-              <span title="Decklist available (no link)">📝</span>
+            {:else if entry.decklist && entry.decklist.length > 0}
+              <button class="decklist-btn" title="View decklist" onclick={() => alert(entry.decklist)}>📝</button>
             {:else}
               -
             {/if}
@@ -488,9 +488,17 @@
     text-align: center;
   }
 
-  .list-cell a {
+  .list-cell a,
+  .list-cell .decklist-btn {
     font-size: 1.1rem;
     text-decoration: none;
+  }
+
+  .decklist-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
   }
 
   .gold {
