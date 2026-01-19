@@ -63,11 +63,17 @@
 
   function getDecklistUrl(decklist: string | null): string | null {
     if (!decklist) return null;
-    if (decklist.startsWith('http')) return decklist;
-    if (decklist.includes('http')) {
-      return decklist.substring(decklist.indexOf('http')).split(' ')[0].split('~~')[0];
+    // Trim and check for URL
+    const trimmed = decklist.trim();
+    if (trimmed.startsWith('http')) return trimmed;
+    if (trimmed.includes('http')) {
+      return trimmed.substring(trimmed.indexOf('http')).split(' ')[0].split('~~')[0];
     }
     return null;
+  }
+
+  function hasDecklist(decklist: string | null): boolean {
+    return decklist !== null && decklist.trim().length > 0;
   }
 
   function updateMinSize(newMinSize: number) {
@@ -170,7 +176,7 @@
       <tr>
         <th style="width: 50px">#</th>
         <th>Player</th>
-        <th class="colors-col">CI</th>
+        <th class="colors-col"></th>
         <th>Commander</th>
         <th class="metric">Record</th>
         <th style="width: 50px">List</th>
@@ -210,6 +216,8 @@
           <td class="list-cell">
             {#if getDecklistUrl(entry.decklist)}
               <a href={getDecklistUrl(entry.decklist)} target="_blank" rel="noopener" onclick={(e) => e.stopPropagation()}>📋</a>
+            {:else if hasDecklist(entry.decklist)}
+              <span title="Decklist available (no link)">📝</span>
             {:else}
               -
             {/if}
