@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
+  import { onMount } from 'svelte';
 
   let { data } = $props();
 
@@ -59,14 +60,6 @@
     ).join('');
   }
 
-  const colorSymbols: Record<string, string> = {
-    W: 'mana-w',
-    U: 'mana-u',
-    B: 'mana-b',
-    R: 'mana-r',
-    G: 'mana-g',
-    C: 'mana-c'
-  };
 
   function getDecklistUrl(decklist: string | null): string | null {
     if (!decklist) return null;
@@ -177,6 +170,7 @@
       <tr>
         <th style="width: 50px">#</th>
         <th>Player</th>
+        <th class="colors-col">CI</th>
         <th>Commander</th>
         <th class="metric">Record</th>
         <th style="width: 50px">List</th>
@@ -202,12 +196,12 @@
               {getPlayerName(entry)}
             </a>
           </td>
+          <td class="colors-col">
+            {#each getCommanderColorIdentity(entry) as color}
+              <i class="ms ms-{color.toLowerCase()} ms-cost"></i>
+            {/each}
+          </td>
           <td class="commander-col">
-            <span class="color-pips">
-              {#each getCommanderColorIdentity(entry) as color}
-                <span class="mana-pip {colorSymbols[color] || ''}"></span>
-              {/each}
-            </span>
             <a href="/commanders/{encodeURIComponent(getCommanderPair(entry))}" onclick={(e) => e.stopPropagation()}>
               {getCommanderPair(entry)}
             </a>
@@ -225,7 +219,7 @@
           {@const playerId = getPlayerId(entry)}
           {@const matches = data.playerMatches?.[playerId] || []}
           <tr class="expanded-row">
-            <td colspan="5">
+            <td colspan="6">
               <div class="expanded-content">
                 {#if matches.length > 0}
                   <table class="pairings-table">
@@ -253,6 +247,10 @@
     </tbody>
   </table>
 </div>
+
+<svelte:head>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/mana-font@latest/css/mana.min.css">
+</svelte:head>
 
 <style>
   .tournament-nav {
@@ -468,27 +466,15 @@
     color: var(--accent);
   }
 
-  .color-pips {
-    display: inline-flex;
-    gap: 2px;
-    margin-right: 6px;
-    vertical-align: middle;
+  .colors-col {
+    white-space: nowrap;
+    width: 80px;
   }
 
-  .mana-pip {
-    display: inline-block;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    border: 1px solid rgba(0, 0, 0, 0.3);
+  .colors-col .ms {
+    font-size: 0.9rem;
+    margin-right: 1px;
   }
-
-  .mana-w { background: linear-gradient(135deg, #fffcd5 0%, #f0e6b3 100%); }
-  .mana-u { background: linear-gradient(135deg, #0e68ab 0%, #0a4f85 100%); }
-  .mana-b { background: linear-gradient(135deg, #4a4a4a 0%, #1a1a1a 100%); }
-  .mana-r { background: linear-gradient(135deg, #d32f2f 0%, #a31515 100%); }
-  .mana-g { background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%); }
-  .mana-c { background: linear-gradient(135deg, #9e9e9e 0%, #757575 100%); }
 
   .list-cell {
     text-align: center;
