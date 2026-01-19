@@ -1,91 +1,35 @@
 import { supabase } from '$lib/supabase';
 import type { PageServerLoad } from './$types';
 
-// Calculate date range from period string
-function getDateRange(period: string, customStart?: string, customEnd?: string): { start: string; end: string; label: string } {
-  const now = new Date();
-  const end = now.toISOString().split('T')[0];
+// Map URL periods to precalc periods
+const PRECALC_PERIODS: Record<string, string> = {
+  'all': 'all',
+  '1y': '1y',
+  '6m': '6m',
+  '3m': '3m',
+  '1m': '1m',
+  'post_ban': 'post_ban',
+};
 
-  if (period === 'custom' && customStart && customEnd) {
-    return { start: customStart, end: customEnd, label: 'Custom Range' };
-  }
+// Valid min sizes in precalc table
+const VALID_MIN_SIZES = [16, 30, 50, 100, 250];
 
-  switch (period) {
-    case 'all':
-      return { start: '2020-01-01', end, label: 'All Time' };
-    case 'post_ban':
-      return { start: '2024-09-23', end, label: 'Post-RC Era' };
-    case 'last_week': {
-      const dayOfWeek = now.getDay();
-      const daysToLastMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-      const thisMonday = new Date(now);
-      thisMonday.setDate(now.getDate() - daysToLastMonday);
-      const lastMonday = new Date(thisMonday);
-      lastMonday.setDate(thisMonday.getDate() - 7);
-      const lastSunday = new Date(thisMonday);
-      lastSunday.setDate(thisMonday.getDate() - 1);
-      return {
-        start: lastMonday.toISOString().split('T')[0],
-        end: lastSunday.toISOString().split('T')[0],
-        label: 'Last Week'
-      };
-    }
-    case 'current_month': {
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-      return {
-        start: monthStart.toISOString().split('T')[0],
-        end,
-        label: monthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-      };
-    }
-    case 'prev_month': {
-      const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
-      return {
-        start: prevMonthStart.toISOString().split('T')[0],
-        end: prevMonthEnd.toISOString().split('T')[0],
-        label: prevMonthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-      };
-    }
-    case '1m': {
-      const thirtyDays = new Date(now);
-      thirtyDays.setDate(thirtyDays.getDate() - 30);
-      return { start: thirtyDays.toISOString().split('T')[0], end, label: 'Last 30 Days' };
-    }
-    case '3m': {
-      const threeMonths = new Date(now);
-      threeMonths.setMonth(threeMonths.getMonth() - 3);
-      return { start: threeMonths.toISOString().split('T')[0], end, label: 'Last 3 Months' };
-    }
-    case '6m': {
-      const sixMonths = new Date(now);
-      sixMonths.setMonth(sixMonths.getMonth() - 6);
-      return { start: sixMonths.toISOString().split('T')[0], end, label: 'Last 6 Months' };
-    }
-    case '1y':
-    default: {
-      const oneYear = new Date(now);
-      oneYear.setFullYear(oneYear.getFullYear() - 1);
-      return { start: oneYear.toISOString().split('T')[0], end, label: 'Last Year' };
-    }
-  }
+function getClosestMinSize(size: number): number {
+  // Find the largest valid size <= requested size
+  const valid = VALID_MIN_SIZES.filter(s => s <= size);
+  return valid.length > 0 ? Math.max(...valid) : 16;
 }
 
-interface PlayerStats {
-  player_id: string;
-  player_name: string;
-  openskill_elo: number | null;
-  entries: number;
-  wins: number;
-  losses: number;
-  draws: number;
-  conversions: number;
-  top4s: number;
-  championships: number;
-  main_commander: string | null;
-  commander_pct: number | null;
-  avg_placement_pct: number | null;
-  elo_rank: number | null;
+function getPeriodLabel(period: string): string {
+  const labels: Record<string, string> = {
+    'all': 'All Time',
+    '1y': 'Last Year',
+    '6m': 'Last 6 Months',
+    '3m': 'Last 3 Months',
+    '1m': 'Last 30 Days',
+    'post_ban': 'Post-RC Era',
+  };
+  return labels[period] || period;
 }
 
 export const load: PageServerLoad = async ({ url }) => {
@@ -97,337 +41,151 @@ export const load: PageServerLoad = async ({ url }) => {
   const sortBy = url.searchParams.get('sort') || 'openskill_elo';
   const sortOrder = url.searchParams.get('order') || 'desc';
   const search = url.searchParams.get('search') || '';
-  const customStart = url.searchParams.get('start') || undefined;
-  const customEnd = url.searchParams.get('end') || undefined;
   const rankedOnly = url.searchParams.get('ranked') !== 'false';
 
   const offset = (page - 1) * perPage;
-  const dateRange = getDateRange(period, customStart, customEnd);
 
-  // First get tournaments in the date range
-  let tournamentsQuery = supabase
-    .from('tournaments')
-    .select('tid, total_players, top_cut, start_date')
-    .gte('total_players', minSize)
-    .eq('is_league', false);
+  // Map to precalc period
+  const precalcPeriod = PRECALC_PERIODS[period];
+  const precalcMinSize = getClosestMinSize(minSize);
 
-  if (dateRange.start) {
-    tournamentsQuery = tournamentsQuery.gte('start_date', dateRange.start);
-  }
-  if (dateRange.end) {
-    tournamentsQuery = tournamentsQuery.lte('start_date', dateRange.end);
-  }
-
-  const { data: tournaments } = await tournamentsQuery.limit(10000);
-  console.log('Period:', period, 'Date range:', dateRange.start, '-', dateRange.end, 'Min size:', minSize, 'Tournaments found:', tournaments?.length || 0);
-
-  if (!tournaments || tournaments.length === 0) {
+  if (!precalcPeriod) {
+    // Unsupported period - return empty for now
+    // TODO: Could fall back to live calculation for custom periods
     return {
       players: [],
       page,
       perPage,
       period,
       minSize,
+      minEntries,
+      rankedOnly,
       sortBy,
       sortOrder,
       search,
       totalCount: 0,
       totalPages: 0,
       avgElo: null,
-      maxElo: null
+      maxElo: null,
+      periodLabel: 'Unsupported period',
+      usingPrecalc: false,
     };
   }
 
-  const tournamentIds = tournaments.map(t => t.tid);
-  const tournamentMap: Record<string, any> = {};
-  for (const t of tournaments) {
-    tournamentMap[t.tid] = t;
-  }
+  // Map sortBy to column names
+  const sortColumnMap: Record<string, string> = {
+    'openskill_elo': 'openskill_elo',
+    'player_name': 'player_name',
+    'entries': 'entries',
+    'wins': 'total_wins',
+    'win_rate': 'win_rate',
+    'five_swiss': 'five_swiss',
+    'conversions': 'conversions',
+    'conv_pct': 'conversion_rate',
+    'top4s': 'top4s',
+    'top4_pct': 'top4_rate',
+    'championships': 'championships',
+    'champ_pct': 'champ_rate',
+    'placement_pct': 'avg_placement_pct',
+  };
+  const sortColumn = sortColumnMap[sortBy] || 'openskill_elo';
 
-  // Batch fetch entries to avoid .in() limits
-  const BATCH_SIZE = 100;
-  let entries: any[] = [];
-  for (let i = 0; i < tournamentIds.length; i += BATCH_SIZE) {
-    const batch = tournamentIds.slice(i, i + BATCH_SIZE);
-    const { data: batchEntries, error: batchError } = await supabase
-      .from('tournament_entries')
-      .select(`
-        entry_id,
-        player_id,
-        tid,
-        standing,
-        wins,
-        losses,
-        draws,
-        deck_commanders (
-          commander_name
-        ),
-        players (
-          player_id,
-          player_name,
-          openskill_elo,
-          openskill_games
-        )
-      `)
-      .in('tid', batch)
-      .limit(100000);
+  // Build query for precalc table
+  let query = supabase
+    .from('leaderboard_stats')
+    .select('*', { count: 'exact' })
+    .eq('period', precalcPeriod)
+    .eq('min_size', precalcMinSize);
 
-    if (batchError) {
-      console.error('Error fetching batch:', batchError);
-    }
-    if (batchEntries) {
-      entries = entries.concat(batchEntries);
-    }
-  }
-
-  // Filter out entries without player data and apply rankedOnly filter
-  entries = entries.filter(e => e.players);
-  console.log('Entries with player data:', entries.length);
-  if (rankedOnly) {
-    entries = entries.filter(e => (e.players as any)?.openskill_games >= 10);
-    console.log('Entries after rankedOnly filter:', entries.length);
-  }
-
-  // Add tournament data to entries
-  entries = entries.map(e => ({
-    ...e,
-    tournaments: tournamentMap[e.tid]
-  }));
-
-  const entriesError = null;
-
-  if (entriesError) {
-    console.error('Error fetching entries:', entriesError);
-    return {
-      players: [],
-      page,
-      perPage,
-      period,
-      minSize,
-      sortBy,
-      sortOrder,
-      search,
-      totalCount: 0,
-      totalPages: 0,
-      avgElo: null,
-      maxElo: null
-    };
-  }
-
-  // Aggregate stats per player
-  const playerMap = new Map<string, {
-    player_id: string;
-    player_name: string;
-    openskill_elo: number | null;
-    entries: number;
-    wins: number;
-    losses: number;
-    draws: number;
-    conversions: number;
-    top4s: number;
-    championships: number;
-    placement_sum: number;
-    commander_counts: Map<string, number>;
-  }>();
-
-  for (const entry of entries || []) {
-    const player = entry.players as any;
-    const tournament = entry.tournaments as any;
-    const playerId = player?.player_id;
-
-    if (!playerId) continue;
-
-    if (!playerMap.has(playerId)) {
-      playerMap.set(playerId, {
-        player_id: playerId,
-        player_name: player.player_name,
-        openskill_elo: player.openskill_elo,
-        entries: 0,
-        wins: 0,
-        losses: 0,
-        draws: 0,
-        conversions: 0,
-        top4s: 0,
-        championships: 0,
-        placement_sum: 0,
-        commander_counts: new Map()
-      });
-    }
-
-    const stats = playerMap.get(playerId)!;
-    stats.entries++;
-    stats.wins += entry.wins || 0;
-    stats.losses += entry.losses || 0;
-    stats.draws += entry.draws || 0;
-
-    // Conversion (made top cut)
-    if (tournament?.top_cut && entry.standing <= tournament.top_cut) {
-      stats.conversions++;
-    }
-
-    // Top 4
-    if (entry.standing <= 4 && tournament?.top_cut) {
-      stats.top4s++;
-    }
-
-    // Championship
-    if (entry.standing === 1) {
-      stats.championships++;
-    }
-
-    // Placement percentile (100% = 1st place, 0% = last place)
-    if (tournament?.total_players && entry.standing) {
-      const placementPct = ((tournament.total_players - entry.standing) / (tournament.total_players - 1)) * 100;
-      stats.placement_sum += placementPct;
-    }
-
-    // Count commander usage
-    const commanders = (entry.deck_commanders as any[]) || [];
-    const commanderPair = commanders.map((c: any) => c.commander_name).sort().join(' / ');
-    if (commanderPair) {
-      stats.commander_counts.set(commanderPair, (stats.commander_counts.get(commanderPair) || 0) + 1);
-    }
-  }
-
-  // Convert to array and calculate derived stats
-  let players: PlayerStats[] = Array.from(playerMap.values()).map(stats => {
-    // Find main commander
-    let mainCommander: string | null = null;
-    let maxCount = 0;
-    for (const [cmd, count] of stats.commander_counts) {
-      if (count > maxCount) {
-        maxCount = count;
-        mainCommander = cmd;
-      }
-    }
-    const commanderPct = stats.entries > 0 ? (maxCount / stats.entries) * 100 : null;
-
-    return {
-      player_id: stats.player_id,
-      player_name: stats.player_name,
-      openskill_elo: stats.openskill_elo,
-      entries: stats.entries,
-      wins: stats.wins,
-      losses: stats.losses,
-      draws: stats.draws,
-      conversions: stats.conversions,
-      top4s: stats.top4s,
-      championships: stats.championships,
-      main_commander: mainCommander,
-      commander_pct: commanderPct,
-      avg_placement_pct: stats.entries > 0 ? stats.placement_sum / stats.entries : null,
-      elo_rank: null // Will be calculated after sorting by ELO
-    };
-  });
-
-  // Filter by minimum entries
-  console.log('minEntries param:', minEntries, 'players before filter:', players.length);
+  // Apply min entries filter
   if (minEntries > 1) {
-    players = players.filter(p => p.entries >= minEntries);
-    console.log('players after minEntries filter:', players.length);
+    query = query.gte('entries', minEntries);
   }
 
-  // Filter by search
+  // Apply search filter
   if (search) {
-    const searchLower = search.toLowerCase();
-    players = players.filter(p => p.player_name.toLowerCase().includes(searchLower));
+    query = query.ilike('player_name', `%${search}%`);
   }
 
-  // Calculate ELO ranks before other sorting
-  const eloSorted = [...players].sort((a, b) => (b.openskill_elo || 0) - (a.openskill_elo || 0));
-  eloSorted.forEach((p, idx) => {
-    const player = players.find(pl => pl.player_id === p.player_id);
-    if (player) player.elo_rank = idx + 1;
-  });
+  // Apply sorting
+  const ascending = sortOrder === 'asc';
+  query = query.order(sortColumn, { ascending, nullsFirst: false });
 
-  // Sort
-  const sortMultiplier = sortOrder === 'desc' ? -1 : 1;
-  players.sort((a, b) => {
-    let aVal: number | string = 0;
-    let bVal: number | string = 0;
+  // Secondary sort by entries for ties
+  if (sortColumn !== 'entries') {
+    query = query.order('entries', { ascending: false });
+  }
 
-    switch (sortBy) {
-      case 'player_name':
-        return sortMultiplier * a.player_name.localeCompare(b.player_name);
-      case 'openskill_elo':
-        aVal = a.openskill_elo || 0;
-        bVal = b.openskill_elo || 0;
-        break;
-      case 'entries':
-        aVal = a.entries;
-        bVal = b.entries;
-        break;
-      case 'wins':
-        aVal = a.wins;
-        bVal = b.wins;
-        break;
-      case 'win_rate': {
-        const aTotal = a.wins + a.losses + a.draws;
-        const bTotal = b.wins + b.losses + b.draws;
-        aVal = aTotal > 0 ? a.wins / aTotal : 0;
-        bVal = bTotal > 0 ? b.wins / bTotal : 0;
-        break;
-      }
-      case 'five_swiss': {
-        const aTotal = a.wins + a.losses + a.draws;
-        const bTotal = b.wins + b.losses + b.draws;
-        const aWinRate = aTotal > 0 ? a.wins / aTotal : 0;
-        const bWinRate = bTotal > 0 ? b.wins / bTotal : 0;
-        const aDrawRate = aTotal > 0 ? a.draws / aTotal : 0;
-        const bDrawRate = bTotal > 0 ? b.draws / bTotal : 0;
-        aVal = (aWinRate * 5) + (aDrawRate * 1);
-        bVal = (bWinRate * 5) + (bDrawRate * 1);
-        break;
-      }
-      case 'conversions':
-        aVal = a.conversions;
-        bVal = b.conversions;
-        break;
-      case 'conv_pct':
-        aVal = a.entries > 0 ? a.conversions / a.entries : 0;
-        bVal = b.entries > 0 ? b.conversions / b.entries : 0;
-        break;
-      case 'top4s':
-        aVal = a.top4s;
-        bVal = b.top4s;
-        break;
-      case 'top4_pct':
-        aVal = a.entries > 0 ? a.top4s / a.entries : 0;
-        bVal = b.entries > 0 ? b.top4s / b.entries : 0;
-        break;
-      case 'championships':
-        aVal = a.championships;
-        bVal = b.championships;
-        break;
-      case 'champ_pct':
-        aVal = a.entries > 0 ? a.championships / a.entries : 0;
-        bVal = b.entries > 0 ? b.championships / b.entries : 0;
-        break;
-      case 'placement_pct':
-        aVal = a.avg_placement_pct || 0;
-        bVal = b.avg_placement_pct || 0;
-        break;
-      default:
-        aVal = a.openskill_elo || 0;
-        bVal = b.openskill_elo || 0;
-    }
+  // Apply pagination
+  query = query.range(offset, offset + perPage - 1);
 
-    return sortMultiplier * ((aVal as number) - (bVal as number));
-  });
+  const { data: players, error, count } = await query;
 
-  const totalCount = players.length;
+  if (error) {
+    console.error('Error fetching leaderboard:', error);
+    return {
+      players: [],
+      page,
+      perPage,
+      period,
+      minSize,
+      minEntries,
+      rankedOnly,
+      sortBy,
+      sortOrder,
+      search,
+      totalCount: 0,
+      totalPages: 0,
+      avgElo: null,
+      maxElo: null,
+      periodLabel: getPeriodLabel(period),
+      usingPrecalc: true,
+      error: error.message,
+    };
+  }
+
+  const totalCount = count || 0;
   const totalPages = Math.ceil(totalCount / perPage);
 
-  // Paginate
-  const paginatedPlayers = players.slice(offset, offset + perPage);
+  // Calculate ELO ranks for display
+  // For accurate global rank, we'd need to query separately, but for now use page-relative
+  const formattedPlayers = (players || []).map((p, idx) => ({
+    player_id: p.player_id,
+    player_name: p.player_name,
+    openskill_elo: p.openskill_elo,
+    entries: p.entries,
+    wins: p.total_wins,
+    losses: p.total_losses,
+    draws: p.total_draws,
+    conversions: p.conversions,
+    top4s: p.top4s,
+    championships: p.championships,
+    main_commander: p.main_commander,
+    commander_pct: p.commander_pct,
+    avg_placement_pct: p.avg_placement_pct,
+    win_rate: p.win_rate,
+    five_swiss: p.five_swiss,
+    conversion_rate: p.conversion_rate,
+    top4_rate: p.top4_rate,
+    champ_rate: p.champ_rate,
+    elo_rank: offset + idx + 1, // Approximate rank based on sort position
+  }));
 
-  // Calculate ELO stats
-  const eloValues = players.map(p => p.openskill_elo).filter(e => e != null) as number[];
+  // Get ELO stats from the full filtered set
+  const { data: statsData } = await supabase
+    .from('leaderboard_stats')
+    .select('openskill_elo')
+    .eq('period', precalcPeriod)
+    .eq('min_size', precalcMinSize)
+    .gte('entries', minEntries)
+    .not('openskill_elo', 'is', null);
+
+  const eloValues = (statsData || []).map(p => p.openskill_elo).filter(e => e != null) as number[];
   const avgElo = eloValues.length > 0 ? eloValues.reduce((a, b) => a + b, 0) / eloValues.length : null;
   const maxElo = eloValues.length > 0 ? Math.max(...eloValues) : null;
 
   return {
-    players: paginatedPlayers,
+    players: formattedPlayers,
     page,
     perPage,
     period,
@@ -441,8 +199,7 @@ export const load: PageServerLoad = async ({ url }) => {
     totalPages,
     avgElo,
     maxElo,
-    periodStart: dateRange.start,
-    periodEnd: dateRange.end,
-    periodLabel: dateRange.label
+    periodLabel: getPeriodLabel(period),
+    usingPrecalc: true,
   };
 };
