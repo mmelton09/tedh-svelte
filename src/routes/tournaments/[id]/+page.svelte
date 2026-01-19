@@ -213,9 +213,9 @@
             </a>
           </td>
           <td class="metric">{entry.wins}-{entry.losses}-{entry.draws}</td>
-          <td class="list-cell">
+          <td class="list-cell" onclick={(e) => e.stopPropagation()}>
             {#if getDecklistUrl(entry.decklist)}
-              <a href={getDecklistUrl(entry.decklist)} target="_blank" rel="noopener" onclick={(e) => e.stopPropagation()}>📋</a>
+              <a href={getDecklistUrl(entry.decklist)} target="_blank" rel="noopener">📋</a>
             {:else if hasDecklist(entry.decklist)}
               <span title="Decklist available (no link)">📝</span>
             {:else}
