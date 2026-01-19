@@ -42,6 +42,32 @@
     return commanders.map((c: any) => c.commander_name).sort().join(' / ') || '-';
   }
 
+  function getCommanderColorIdentity(entry: any): string {
+    const commanders = (entry.deck_commanders as any[]) || [];
+    let allColors = '';
+    for (const c of commanders) {
+      const colors = data.colorMap?.[c.commander_name] || '';
+      for (const color of colors) {
+        if (!allColors.includes(color)) {
+          allColors += color;
+        }
+      }
+    }
+    const colorOrder = 'WUBRGC';
+    return [...allColors].sort((a, b) =>
+      colorOrder.indexOf(a) - colorOrder.indexOf(b)
+    ).join('');
+  }
+
+  const colorSymbols: Record<string, string> = {
+    W: 'mana-w',
+    U: 'mana-u',
+    B: 'mana-b',
+    R: 'mana-r',
+    G: 'mana-g',
+    C: 'mana-c'
+  };
+
   function getDecklistUrl(decklist: string | null): string | null {
     if (!decklist) return null;
     if (decklist.startsWith('http')) return decklist;
@@ -92,11 +118,11 @@
         value={data.minSize}
         onchange={(e) => updateMinSize(parseInt(e.currentTarget.value))}
       >
-        <option value="16">16+</option>
-        <option value="30">30+</option>
-        <option value="50">50+</option>
-        <option value="100">100+</option>
-        <option value="250">250+</option>
+        <option value={16}>16+</option>
+        <option value={30}>30+</option>
+        <option value={50}>50+</option>
+        <option value={100}>100+</option>
+        <option value={250}>250+</option>
       </select>
     </div>
   </div>
@@ -177,6 +203,11 @@
             </a>
           </td>
           <td class="commander-col">
+            <span class="color-pips">
+              {#each getCommanderColorIdentity(entry) as color}
+                <span class="mana-pip {colorSymbols[color] || ''}"></span>
+              {/each}
+            </span>
             <a href="/commanders/{encodeURIComponent(getCommanderPair(entry))}" onclick={(e) => e.stopPropagation()}>
               {getCommanderPair(entry)}
             </a>
@@ -436,6 +467,28 @@
   .commander-col a:hover {
     color: var(--accent);
   }
+
+  .color-pips {
+    display: inline-flex;
+    gap: 2px;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+
+  .mana-pip {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 0, 0, 0.3);
+  }
+
+  .mana-w { background: linear-gradient(135deg, #fffcd5 0%, #f0e6b3 100%); }
+  .mana-u { background: linear-gradient(135deg, #0e68ab 0%, #0a4f85 100%); }
+  .mana-b { background: linear-gradient(135deg, #4a4a4a 0%, #1a1a1a 100%); }
+  .mana-r { background: linear-gradient(135deg, #d32f2f 0%, #a31515 100%); }
+  .mana-g { background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%); }
+  .mana-c { background: linear-gradient(135deg, #9e9e9e 0%, #757575 100%); }
 
   .list-cell {
     text-align: center;

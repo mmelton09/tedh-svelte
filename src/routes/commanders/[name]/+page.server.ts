@@ -28,7 +28,40 @@ async function getCardImages(cardName: string): Promise<{ art: string | null; fu
   }
 }
 
-// Calculate date range from period string (matching Flask get_time_range)
+// Map URL periods to precalc periods
+const PRECALC_PERIODS: Record<string, string> = {
+  'all': 'all',
+  '1y': '1y',
+  '6m': '6m',
+  '6mo': '6m',
+  '3m': '3m',
+  '90d': '3m',
+  '1m': '1m',
+  '30d': '1m',
+  'post_ban': 'post_ban',
+};
+
+// Valid min sizes in precalc table
+const VALID_MIN_SIZES = [16, 30, 50, 100, 250];
+
+function getClosestMinSize(size: number): number {
+  const valid = VALID_MIN_SIZES.filter(s => s <= size);
+  return valid.length > 0 ? Math.max(...valid) : 16;
+}
+
+function getPeriodLabel(period: string): string {
+  const labels: Record<string, string> = {
+    'all': 'All Time',
+    '1y': 'Last Year',
+    '6m': 'Last 6 Months',
+    '3m': 'Last 3 Months',
+    '1m': 'Last 30 Days',
+    'post_ban': 'Post-RC Era',
+  };
+  return labels[period] || period;
+}
+
+// Calculate date range for displaying in UI and for live queries
 function getDateRange(period: string): { start: string; end: string; label: string } {
   const now = new Date();
   const end = now.toISOString().split('T')[0];
@@ -39,42 +72,6 @@ function getDateRange(period: string): { start: string; end: string; label: stri
 
     case 'post_ban':
       return { start: '2024-09-23', end, label: 'Post-RC Era' };
-
-    case 'last_week': {
-      // Get last complete week (Mon-Sun)
-      const dayOfWeek = now.getDay();
-      const daysToLastMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-      const thisMonday = new Date(now);
-      thisMonday.setDate(now.getDate() - daysToLastMonday);
-      const lastMonday = new Date(thisMonday);
-      lastMonday.setDate(thisMonday.getDate() - 7);
-      const lastSunday = new Date(thisMonday);
-      lastSunday.setDate(thisMonday.getDate() - 1);
-      return {
-        start: lastMonday.toISOString().split('T')[0],
-        end: lastSunday.toISOString().split('T')[0],
-        label: 'Last Week'
-      };
-    }
-
-    case 'current_month': {
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-      return {
-        start: monthStart.toISOString().split('T')[0],
-        end,
-        label: monthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-      };
-    }
-
-    case 'prev_month': {
-      const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
-      return {
-        start: prevMonthStart.toISOString().split('T')[0],
-        end: prevMonthEnd.toISOString().split('T')[0],
-        label: prevMonthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-      };
-    }
 
     case '30d':
     case '1m': {
@@ -148,305 +145,82 @@ export const load: PageServerLoad = async ({ params, url }) => {
     ).join('');
   })();
 
-  // Try to use RPC for aggregated pilot data (much more efficient)
-  const { data: rpcPilots, error: rpcError } = await supabase.rpc('get_commander_pilots', {
-    p_commander_name: commanderName,
-    p_start_date: dateRange.start,
-    p_end_date: dateRange.end,
-    p_min_size: minSize,
-    p_sort_by: sortBy,
-    p_sort_order: sortOrder,
-    p_page: page,
-    p_per_page: perPage
-  });
+  // Map to precalc period
+  const precalcPeriod = PRECALC_PERIODS[period];
+  const precalcMinSize = getClosestMinSize(minSize);
 
   let pilots: any[] = [];
   let totalPilots = 0;
   let totalPages = 1;
-  let usedRpc = false;
 
-  console.log('RPC result:', { rpcError: rpcError?.message, rpcPilotsCount: rpcPilots?.length });
-  if (!rpcError && rpcPilots && rpcPilots.length > 0) {
-    // RPC worked - use its data
-    usedRpc = true;
-    totalPilots = rpcPilots[0]?.total_count || rpcPilots.length;
-    totalPages = Math.ceil(totalPilots / perPage);
+  // Map sortBy to column names in precalc table
+  const sortColumnMap: Record<string, string> = {
+    'placement_pct': 'avg_placement_pct',
+    'name': 'player_name',
+    'elo': 'openskill_elo',
+    'entries': 'entries',
+    'win_rate': 'win_rate',
+    'five_swiss': 'five_swiss',
+    'conversions': 'conversions',
+    'conv_rate': 'conversion_rate',
+    'top4_rate': 'top4_rate',
+    'champ_rate': 'champ_rate',
+  };
+  const sortColumn = sortColumnMap[sortBy] || 'avg_placement_pct';
 
-    // Get tournament details for pilots on current page
-    const playerIds = rpcPilots.map((p: any) => p.player_id);
+  if (precalcPeriod) {
+    // Use precalculated table for fast queries
+    let query = supabase
+      .from('commander_pilots')
+      .select('*', { count: 'exact' })
+      .eq('commander_pair', commanderName)
+      .eq('period', precalcPeriod)
+      .eq('min_size', precalcMinSize);
 
-    const { data: tournamentData } = await supabase.rpc('get_commander_pilot_tournaments', {
-      p_commander_name: commanderName,
-      p_start_date: dateRange.start,
-      p_end_date: dateRange.end,
-      p_min_size: minSize,
-      p_player_ids: playerIds
-    });
+    // Apply sorting
+    const ascending = sortOrder === 'asc';
+    query = query.order(sortColumn, { ascending, nullsFirst: false });
 
-    // Group tournaments by player_id
-    const playerTournaments: Record<string, any[]> = {};
-    for (const t of tournamentData || []) {
-      if (!playerTournaments[t.player_id]) {
-        playerTournaments[t.player_id] = [];
-      }
-      playerTournaments[t.player_id].push({
-        tid: t.tid,
-        tournament_name: t.tournament_name,
-        start_date: t.start_date,
-        standing: t.standing,
-        total_players: t.total_players,
-        wins: t.wins,
-        losses: t.losses,
-        draws: t.draws,
-        decklist: t.decklist
-      });
+    // Secondary sort by entries for ties
+    if (sortColumn !== 'entries') {
+      query = query.order('entries', { ascending: false });
     }
 
-    pilots = rpcPilots.map((p: any) => ({
-      player_id: p.player_id,
-      player_name: p.player_name,
-      openskill_elo: p.openskill_elo,
-      entries: Number(p.entries),
-      total_wins: Number(p.total_wins),
-      total_losses: Number(p.total_losses),
-      total_draws: Number(p.total_draws),
-      conversions: Number(p.conversions),
-      top4s: Number(p.top4s),
-      championships: Number(p.championships),
-      win_rate: Number(p.win_rate) || 0,
-      five_swiss: Number(p.five_swiss) || null,
-      conversion_rate: Number(p.conversion_rate) || 0,
-      top4_rate: Number(p.top4_rate) || 0,
-      champ_rate: Number(p.champ_rate) || 0,
-      conv_vs_expected: Number(p.conv_vs_expected) || 0,
-      top4_vs_expected: Number(p.top4_vs_expected) || 0,
-      champ_vs_expected: Number(p.champ_vs_expected) || 0,
-      avg_placement_pct: Number(p.placement_pct) || 0,
-      tournaments: playerTournaments[p.player_id] || []
-    }));
-  } else {
-    // Fallback: fetch entries and aggregate in JavaScript
-    // This is less efficient but works without the RPC
-    console.log('RPC not available, falling back to JS aggregation:', rpcError?.message);
+    // Apply pagination
+    const offset = (page - 1) * perPage;
+    query = query.range(offset, offset + perPage - 1);
 
-    let entriesQuery = supabase
-      .from('tournament_entries')
-      .select(`
-        entry_id,
-        player_id,
-        standing,
-        wins,
-        losses,
-        draws,
-        decklist,
-        tournaments!inner (
-          tid,
-          tournament_name,
-          start_date,
-          total_players,
-          top_cut
-        ),
-        deck_commanders (
-          commander_name
-        ),
-        players!inner (
-          player_id,
-          player_name,
-          openskill_elo
-        )
-      `)
-      .gte('tournaments.total_players', minSize)
-      .eq('tournaments.is_league', false)
-      .gte('tournaments.start_date', dateRange.start)
-      .lte('tournaments.start_date', dateRange.end)
-      .limit(10000); // Increase limit to get more data
+    const { data: precalcPilots, error: precalcError, count } = await query;
 
-    const { data: entries, error: entriesError } = await entriesQuery;
+    if (!precalcError && precalcPilots) {
+      totalPilots = count || 0;
+      totalPages = Math.ceil(totalPilots / perPage);
 
-    if (entriesError) {
-      console.error('Error fetching entries:', entriesError);
+      pilots = precalcPilots.map((p: any) => ({
+        player_id: p.player_id,
+        player_name: p.player_name,
+        openskill_elo: p.openskill_elo,
+        entries: p.entries,
+        total_wins: p.total_wins,
+        total_losses: p.total_losses,
+        total_draws: p.total_draws,
+        conversions: p.conversions,
+        top4s: p.top4s,
+        championships: p.championships,
+        win_rate: Number(p.win_rate) || 0,
+        five_swiss: p.five_swiss ? Number(p.five_swiss) : null,
+        conversion_rate: Number(p.conversion_rate) || 0,
+        top4_rate: Number(p.top4_rate) || 0,
+        champ_rate: Number(p.champ_rate) || 0,
+        conv_vs_expected: Number(p.conv_vs_expected) || 0,
+        top4_vs_expected: Number(p.top4_vs_expected) || 0,
+        champ_vs_expected: Number(p.champ_vs_expected) || 0,
+        avg_placement_pct: Number(p.avg_placement_pct) || 0,
+        tournaments: [] // Tournament details fetched on-demand via API
+      }));
+    } else {
+      console.error('Error fetching from precalc table:', precalcError?.message);
     }
-
-    // Filter to only entries matching this commander pair
-    console.log('Fallback: entries fetched:', entries?.length, 'commanderName:', commanderName);
-    const matchingEntries = (entries || []).filter(entry => {
-      const commanders = (entry.deck_commanders as any[]) || [];
-      const commanderPair = commanders
-        .map((c: any) => c.commander_name)
-        .sort()
-        .join(' / ');
-      return commanderPair === commanderName;
-    });
-    console.log('Fallback: matching entries:', matchingEntries.length);
-
-    // Aggregate pilots
-    const pilotMap: Record<string, any> = {};
-
-    for (const entry of matchingEntries) {
-      const player = entry.players as any;
-      const tournament = entry.tournaments as any;
-      const playerId = player?.player_id;
-      if (!playerId) continue;
-
-      if (!pilotMap[playerId]) {
-        pilotMap[playerId] = {
-          player_id: playerId,
-          player_name: player.player_name,
-          openskill_elo: player.openskill_elo,
-          entries: 0,
-          total_wins: 0,
-          total_losses: 0,
-          total_draws: 0,
-          conversions: 0,
-          top4s: 0,
-          championships: 0,
-          placement_sum: 0,
-          expected_conv: 0,
-          expected_top4: 0,
-          expected_champ: 0,
-          tournaments: []
-        };
-      }
-
-      const stats = pilotMap[playerId];
-      stats.entries++;
-      stats.total_wins += entry.wins || 0;
-      stats.total_losses += entry.losses || 0;
-      stats.total_draws += entry.draws || 0;
-
-      const totalPlayers = tournament?.total_players || 1;
-
-      // Accumulate expected values based on tournament size
-      if (tournament?.top_cut && tournament.top_cut > 0) {
-        stats.expected_conv += tournament.top_cut / totalPlayers;
-        if (tournament.top_cut >= 4) {
-          stats.expected_top4 += 4.0 / totalPlayers;
-        }
-      }
-      stats.expected_champ += 1.0 / totalPlayers;
-
-      if (tournament?.top_cut && entry.standing <= tournament.top_cut) {
-        stats.conversions++;
-      }
-      if (entry.standing <= 4 && tournament?.top_cut && tournament.top_cut >= 4) {
-        stats.top4s++;
-      }
-      if (entry.standing === 1) {
-        stats.championships++;
-      }
-
-      // Calculate placement percentile for AvgX%
-      if (tournament?.total_players && entry.standing) {
-        const placementPct = 100 * (1 - entry.standing / tournament.total_players);
-        stats.placement_sum += placementPct;
-      }
-
-      // Add tournament to player's tournament list
-      stats.tournaments.push({
-        tid: tournament?.tid,
-        tournament_name: tournament?.tournament_name,
-        start_date: tournament?.start_date,
-        standing: entry.standing,
-        total_players: tournament?.total_players,
-        wins: entry.wins || 0,
-        losses: entry.losses || 0,
-        draws: entry.draws || 0,
-        decklist: entry.decklist
-      });
-    }
-
-    // Calculate rates and vs_expected values
-    const allPilots = Object.values(pilotMap).map((stats: any) => {
-      const totalGames = stats.total_wins + stats.total_losses + stats.total_draws;
-      const winRate = totalGames > 0 ? stats.total_wins / totalGames : 0;
-      const drawRate = totalGames > 0 ? stats.total_draws / totalGames : 0;
-      const convRate = stats.entries > 0 ? stats.conversions / stats.entries : 0;
-      const top4Rate = stats.entries > 0 ? stats.top4s / stats.entries : 0;
-      const champRate = stats.entries > 0 ? stats.championships / stats.entries : 0;
-
-      // Calculate vs expected: ((actual - expected) / entries) * 100
-      const convVsExpected = stats.entries > 0
-        ? ((stats.conversions - stats.expected_conv) / stats.entries) * 100
-        : 0;
-      const top4VsExpected = stats.entries > 0
-        ? ((stats.top4s - stats.expected_top4) / stats.entries) * 100
-        : 0;
-      const champVsExpected = stats.entries > 0
-        ? ((stats.championships - stats.expected_champ) / stats.entries) * 100
-        : 0;
-
-      // Sort tournaments by date descending
-      stats.tournaments.sort((a: any, b: any) =>
-        new Date(b.start_date || 0).getTime() - new Date(a.start_date || 0).getTime()
-      );
-
-      return {
-        ...stats,
-        win_rate: winRate,
-        five_swiss: totalGames >= 7 ? (winRate * 5) + (drawRate * 1) : null,
-        avg_placement_pct: stats.entries > 0 ? stats.placement_sum / stats.entries : null,
-        conversion_rate: convRate,
-        top4_rate: top4Rate,
-        champ_rate: champRate,
-        conv_vs_expected: convVsExpected,
-        top4_vs_expected: top4VsExpected,
-        champ_vs_expected: champVsExpected
-      };
-    });
-
-    // Sort pilots based on sortBy and sortOrder
-    const sortMultiplier = sortOrder === 'desc' ? -1 : 1;
-    allPilots.sort((a, b) => {
-      let aVal: number | string | null;
-      let bVal: number | string | null;
-
-      switch (sortBy) {
-        case 'name':
-          return sortMultiplier * a.player_name.localeCompare(b.player_name);
-        case 'elo':
-          aVal = a.openskill_elo || 0;
-          bVal = b.openskill_elo || 0;
-          break;
-        case 'entries':
-          aVal = a.entries;
-          bVal = b.entries;
-          break;
-        case 'win_rate':
-          aVal = a.win_rate;
-          bVal = b.win_rate;
-          break;
-        case 'five_swiss':
-          aVal = a.five_swiss || 0;
-          bVal = b.five_swiss || 0;
-          break;
-        case 'conversions':
-          aVal = a.conversions;
-          bVal = b.conversions;
-          break;
-        case 'conv_rate':
-          aVal = a.conversion_rate;
-          bVal = b.conversion_rate;
-          break;
-        case 'top4_rate':
-          aVal = a.top4_rate;
-          bVal = b.top4_rate;
-          break;
-        case 'champ_rate':
-          aVal = a.champ_rate;
-          bVal = b.champ_rate;
-          break;
-        case 'placement_pct':
-        default:
-          aVal = a.avg_placement_pct || 0;
-          bVal = b.avg_placement_pct || 0;
-      }
-      return sortMultiplier * ((bVal as number) - (aVal as number));
-    });
-
-    // Pagination
-    totalPilots = allPilots.length;
-    totalPages = Math.ceil(totalPilots / perPage);
-    pilots = allPilots.slice((page - 1) * perPage, page * perPage);
   }
 
   // Get commander summary stats (for the summary section)

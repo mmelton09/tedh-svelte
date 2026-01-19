@@ -106,6 +106,28 @@ export const load: PageServerLoad = async ({ params, url }) => {
     }
   }
 
+  // Get color identities for all commanders in this tournament
+  const allCommanderNames = new Set<string>();
+  for (const s of standings || []) {
+    const commanders = (s.deck_commanders as any[]) || [];
+    for (const c of commanders) {
+      if (c.commander_name) {
+        allCommanderNames.add(c.commander_name);
+      }
+    }
+  }
+
+  const { data: commanderColors } = await supabase
+    .from('commanders')
+    .select('commander_name, color_identity')
+    .in('commander_name', Array.from(allCommanderNames))
+    .limit(1000);
+
+  const colorMap: Record<string, string> = {};
+  for (const c of commanderColors || []) {
+    colorMap[c.commander_name] = c.color_identity || '';
+  }
+
   // Organize matches by player_id
   const playerMatches: Record<string, any[]> = {};
   for (const match of matches || []) {
@@ -202,6 +224,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
     nextTournament,
     minSize,
     vsAvg,
-    playerMatches
+    playerMatches,
+    colorMap
   };
 };
