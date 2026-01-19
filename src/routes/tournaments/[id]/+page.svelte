@@ -210,9 +210,9 @@
           <td class="metric">{entry.wins}-{entry.losses}-{entry.draws}</td>
           <td class="list-cell" onclick={(e) => e.stopPropagation()}>
             {#if getDecklistUrl(entry.decklist)}
-              <a href={getDecklistUrl(entry.decklist)} target="_blank" rel="noopener">📋</a>
+              <a href={getDecklistUrl(entry.decklist)} target="_blank" rel="noopener" title="View on external site">📋</a>
             {:else if entry.decklist && entry.decklist.length > 0}
-              <a href="/decklist/{entry.entry_id}" target="_blank" rel="noopener">📋</a>
+              <a href="https://topdeck.gg/event/{data.tournament.tid}" target="_blank" rel="noopener" title="View on TopDeck.gg">📋</a>
             {:else}
               -
             {/if}
