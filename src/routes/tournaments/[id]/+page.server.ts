@@ -165,6 +165,40 @@ export const load: PageServerLoad = async ({ params, url }) => {
     playerMatches[playerId].sort((a, b) => a.roundNumber - b.roundNumber);
   }
 
+  // Calculate seat win rates for Swiss rounds only
+  const swissRounds = tournament.swiss_rounds || 0;
+  const seatStats: Record<number, { wins: number; total: number }> = {
+    1: { wins: 0, total: 0 },
+    2: { wins: 0, total: 0 },
+    3: { wins: 0, total: 0 },
+    4: { wins: 0, total: 0 }
+  };
+
+  for (const match of matches || []) {
+    // Only count Swiss rounds (round_number <= swiss_rounds)
+    if (match.round_number > swissRounds) continue;
+    if (!match.winner_id) continue; // Skip draws/incomplete
+
+    const players = (match.match_players as any[]) || [];
+    for (const mp of players) {
+      const seat = mp.turn_order;
+      if (seat >= 1 && seat <= 4) {
+        seatStats[seat].total++;
+        if (mp.player_id === match.winner_id) {
+          seatStats[seat].wins++;
+        }
+      }
+    }
+  }
+
+  const seatWinRates = {
+    s1: seatStats[1].total > 0 ? (seatStats[1].wins / seatStats[1].total) * 100 : null,
+    s2: seatStats[2].total > 0 ? (seatStats[2].wins / seatStats[2].total) * 100 : null,
+    s3: seatStats[3].total > 0 ? (seatStats[3].wins / seatStats[3].total) * 100 : null,
+    s4: seatStats[4].total > 0 ? (seatStats[4].wins / seatStats[4].total) * 100 : null,
+    totalGames: seatStats[1].total // All seats should have same total
+  };
+
   // Calculate vs 100+ average stats
   // Get baseline averages from 100+ player tournaments
   const { data: baselineData } = await supabase
@@ -224,6 +258,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
     nextTournament,
     minSize,
     vsAvg,
+    seatWinRates,
     playerMatches,
     colorMap
   };

@@ -159,6 +159,20 @@
       <span class={getDeltaClass(data.vsAvg.champDelta)}>({formatDelta(data.vsAvg.champDelta)})</span>
     </span>
   </div>
+  {#if data.seatWinRates.totalGames > 0}
+  <div class="info-row seat-rates">
+    <span>Swiss Seat WR:</span>
+    <span>S1 <strong>{data.seatWinRates.s1?.toFixed(1) ?? '-'}%</strong></span>
+    <span class="separator">|</span>
+    <span>S2 <strong>{data.seatWinRates.s2?.toFixed(1) ?? '-'}%</strong></span>
+    <span class="separator">|</span>
+    <span>S3 <strong>{data.seatWinRates.s3?.toFixed(1) ?? '-'}%</strong></span>
+    <span class="separator">|</span>
+    <span>S4 <strong>{data.seatWinRates.s4?.toFixed(1) ?? '-'}%</strong></span>
+    <span class="separator">|</span>
+    <span class="games-count">({data.seatWinRates.totalGames} games)</span>
+  </div>
+  {/if}
   <div class="info-row">
     <a href="/?tid={data.tournament.tid}" class="stats-link">📊 View Commander Stats</a>
   </div>
@@ -338,6 +352,15 @@
   .vs-avg {
     color: var(--text-secondary);
     font-size: 0.9rem;
+  }
+
+  .seat-rates {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+  }
+
+  .seat-rates .games-count {
+    color: var(--text-muted);
   }
 
   .stats-link {
