@@ -223,55 +223,45 @@ export const load: PageServerLoad = async ({ params, url }) => {
     }
   }
 
-  // Get commander summary stats (for the summary section)
-  // Try precomputed table first
-  const precomputedPeriodMap: Record<string, string> = {
-    '30d': '30d', '1m': '30d',
-    '90d': '90d', '3m': '90d',
-    '6mo': '6mo', '6m': '6mo',
-    '1y': '1y',
-    'all': 'all'
-  };
-  const precomputedPeriod = precomputedPeriodMap[period];
-
+  // Get commander summary stats from the precalc pilots table
+  // Aggregate all pilots for this commander to get accurate totals
   let summary: any = null;
-  if (precomputedPeriod) {
-    const { data: summaryStats } = await supabase
-      .from('commander_summary')
-      .select('*')
+  if (precalcPeriod && totalPilots > 0) {
+    // Get all pilots to calculate summary (but don't return all in response)
+    const { data: allPilotsForSummary } = await supabase
+      .from('commander_pilots')
+      .select('entries, total_wins, total_losses, total_draws, conversions, top4s, championships')
       .eq('commander_pair', commanderName)
-      .eq('period', precomputedPeriod)
-      .eq('min_size', minSize)
-      .single();
-    summary = summaryStats;
-  }
+      .eq('period', precalcPeriod)
+      .eq('min_size', precalcMinSize)
+      .limit(10000);
 
-  // If no precomputed summary, calculate from pilots data
-  if (!summary && pilots.length > 0) {
-    const totalEntries = pilots.reduce((sum, p) => sum + p.entries, 0);
-    const totalWins = pilots.reduce((sum, p) => sum + p.total_wins, 0);
-    const totalLosses = pilots.reduce((sum, p) => sum + p.total_losses, 0);
-    const totalDraws = pilots.reduce((sum, p) => sum + p.total_draws, 0);
-    const totalGames = totalWins + totalLosses + totalDraws;
-    const conversions = pilots.reduce((sum, p) => sum + p.conversions, 0);
-    const top4s = pilots.reduce((sum, p) => sum + p.top4s, 0);
-    const championships = pilots.reduce((sum, p) => sum + p.championships, 0);
+    if (allPilotsForSummary && allPilotsForSummary.length > 0) {
+      const totalEntries = allPilotsForSummary.reduce((sum, p) => sum + (p.entries || 0), 0);
+      const totalWins = allPilotsForSummary.reduce((sum, p) => sum + (p.total_wins || 0), 0);
+      const totalLosses = allPilotsForSummary.reduce((sum, p) => sum + (p.total_losses || 0), 0);
+      const totalDraws = allPilotsForSummary.reduce((sum, p) => sum + (p.total_draws || 0), 0);
+      const totalGames = totalWins + totalLosses + totalDraws;
+      const conversions = allPilotsForSummary.reduce((sum, p) => sum + (p.conversions || 0), 0);
+      const top4s = allPilotsForSummary.reduce((sum, p) => sum + (p.top4s || 0), 0);
+      const championships = allPilotsForSummary.reduce((sum, p) => sum + (p.championships || 0), 0);
 
-    summary = {
-      commander_pair: commanderName,
-      entries: totalEntries,
-      unique_pilots: totalPilots,
-      total_wins: totalWins,
-      total_losses: totalLosses,
-      total_draws: totalDraws,
-      win_rate: totalGames > 0 ? totalWins / totalGames : 0,
-      conversions,
-      conversion_rate: totalEntries > 0 ? conversions / totalEntries : 0,
-      top4s,
-      top4_rate: totalEntries > 0 ? top4s / totalEntries : 0,
-      championships,
-      champ_rate: totalEntries > 0 ? championships / totalEntries : 0
-    };
+      summary = {
+        commander_pair: commanderName,
+        entries: totalEntries,
+        unique_pilots: totalPilots,
+        total_wins: totalWins,
+        total_losses: totalLosses,
+        total_draws: totalDraws,
+        win_rate: totalGames > 0 ? totalWins / totalGames : 0,
+        conversions,
+        conversion_rate: totalEntries > 0 ? conversions / totalEntries : 0,
+        top4s,
+        top4_rate: totalEntries > 0 ? top4s / totalEntries : 0,
+        championships,
+        champ_rate: totalEntries > 0 ? championships / totalEntries : 0
+      };
+    }
   }
 
   if (!summary && pilots.length === 0) {
