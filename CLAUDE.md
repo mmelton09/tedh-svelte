@@ -85,6 +85,19 @@ Both projects use the same Supabase database. Key gotcha:
 - Direct connection uses IPv6 which GitHub Actions can't reach
 - Get pooler URL: Supabase dashboard → **Connect** button → **Session** mode
 
+## CRITICAL: Check Original Flask Code First
+
+**When implementing or fixing features that existed on the old site:**
+1. ALWAYS read `/Users/MM/projects/tedh-stats/weekly_meta.py` FIRST
+2. Find the original implementation before writing new code
+3. The Flask app has working implementations for: tournament pages, player pages, commander pages, leaderboard, decklist links, pairings, etc.
+4. Copy the logic, don't reinvent it
+
+Key patterns from original site:
+- **Decklist links**: If decklist starts with 'http' use it, otherwise `https://topdeck.gg/deck/{tid}/{player_id}`
+- **Player matches**: Organized by player_id, keyed by round_number
+- **Color identity**: Uses mana-font CDN icons
+
 ## Common Issues & Solutions
 
 1. **0 data showing**: Check batching on `.in()` queries
