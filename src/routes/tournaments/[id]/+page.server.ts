@@ -52,6 +52,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
     .single();
 
   // Get standings with player and commander info
+  // Filter out 0-0-0 players (signed up but didn't attend)
   const { data: standings, error: standingsError } = await supabase
     .from('tournament_entries')
     .select(`
@@ -71,6 +72,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
       )
     `)
     .eq('tid', tournamentId)
+    .or('wins.gt.0,losses.gt.0,draws.gt.0')
     .order('standing', { ascending: true })
     .limit(10000);
 
