@@ -212,7 +212,7 @@
             {#if getDecklistUrl(entry.decklist)}
               <a href={getDecklistUrl(entry.decklist)} target="_blank" rel="noopener" title="View on external site">📋</a>
             {:else if entry.decklist && entry.decklist.length > 0}
-              <a href="https://topdeck.gg/event/{data.tournament.tid}" target="_blank" rel="noopener" title="View on TopDeck.gg">📋</a>
+              <a href="https://topdeck.gg/deck/{data.tournament.tid}/{getPlayerId(entry)}" target="_blank" rel="noopener" title="View on TopDeck.gg">📋</a>
             {:else}
               -
             {/if}
