@@ -199,13 +199,14 @@ export const load: PageServerLoad = async ({ params, url }) => {
     totalGames: seatStats[1].total // All seats should have same total
   };
 
-  // Calculate vs 100+ average stats
-  // Get baseline averages from 100+ player tournaments
+  // Calculate vs bracket average stats
+  // Compare against tournaments in the same size bracket (minSize filter)
   const { data: baselineData } = await supabase
     .from('tournaments')
     .select('tid, total_players, top_cut')
-    .gte('total_players', 100)
+    .gte('total_players', minSize)
     .eq('is_league', false)
+    .gt('top_cut', 0)
     .limit(10000);
 
   let baselineConvRate = 0;

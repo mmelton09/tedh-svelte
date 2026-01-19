@@ -143,7 +143,7 @@
     <span>Top Cut: <strong>{data.tournament.top_cut || '-'}</strong></span>
   </div>
   <div class="info-row vs-avg">
-    <span>vs 100+ avg:</span>
+    <span>vs {data.minSize}+ avg:</span>
     <span>
       Conv {data.vsAvg.convRate.toFixed(1)}%
       <span class={getDeltaClass(data.vsAvg.convDelta)}>({formatDelta(data.vsAvg.convDelta)})</span>
