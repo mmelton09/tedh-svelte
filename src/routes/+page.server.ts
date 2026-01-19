@@ -29,6 +29,7 @@ function getClosestMinSize(size: number): number {
 }
 
 function getPeriodLabel(period: string): string {
+  const now = new Date();
   const labels: Record<string, string> = {
     'all': 'All Time',
     '1y': 'Last Year',
@@ -36,6 +37,10 @@ function getPeriodLabel(period: string): string {
     '3m': 'Last 3 Months',
     '1m': 'Last 30 Days',
     'post_ban': 'Post-RC Era',
+    'last_week': 'Last Week',
+    'current_month': now.toLocaleDateString('en-US', { month: 'long' }),
+    'prev_month': new Date(now.getFullYear(), now.getMonth() - 1, 1).toLocaleDateString('en-US', { month: 'long' }),
+    'prev_month_2': new Date(now.getFullYear(), now.getMonth() - 2, 1).toLocaleDateString('en-US', { month: 'long' }),
   };
   return labels[period] || period;
 }
@@ -48,6 +53,28 @@ function getDateRange(period: string): { start: string; end: string; label: stri
   let start: Date;
   let label: string;
   switch (period) {
+    case 'last_week': {
+      start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      label = 'Last Week';
+      break;
+    }
+    case 'current_month': {
+      start = new Date(now.getFullYear(), now.getMonth(), 1);
+      label = now.toLocaleDateString('en-US', { month: 'long' });
+      break;
+    }
+    case 'prev_month': {
+      start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const endOfPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+      const prevMonthLabel = start.toLocaleDateString('en-US', { month: 'long' });
+      return { start: start.toISOString().split('T')[0], end: endOfPrevMonth.toISOString().split('T')[0], label: prevMonthLabel };
+    }
+    case 'prev_month_2': {
+      start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+      const endOfPrevMonth2 = new Date(now.getFullYear(), now.getMonth() - 1, 0);
+      const prevMonth2Label = start.toLocaleDateString('en-US', { month: 'long' });
+      return { start: start.toISOString().split('T')[0], end: endOfPrevMonth2.toISOString().split('T')[0], label: prevMonth2Label };
+    }
     case '1m':
       start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
       label = 'Last 30 Days';
