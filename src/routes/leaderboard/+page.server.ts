@@ -148,27 +148,44 @@ export const load: PageServerLoad = async ({ url }) => {
   const totalPages = Math.ceil(totalCount / perPage);
 
   // Calculate ELO ranks for display
-  // For accurate global rank, we'd need to query separately, but for now use page-relative
-  const formattedPlayers = (players || []).map((p, idx) => ({
-    player_id: p.player_id,
-    player_name: p.player_name,
-    openskill_elo: p.openskill_elo,
-    entries: p.entries,
-    wins: p.total_wins,
-    losses: p.total_losses,
-    draws: p.total_draws,
-    conversions: p.conversions,
-    top4s: p.top4s,
-    championships: p.championships,
-    main_commander: p.main_commander,
-    commander_pct: p.commander_pct,
-    avg_placement_pct: p.avg_placement_pct,
-    win_rate: p.win_rate,
-    five_swiss: p.five_swiss,
-    conversion_rate: p.conversion_rate,
-    top4_rate: p.top4_rate,
-    champ_rate: p.champ_rate,
-    elo_rank: offset + idx + 1, // Approximate rank based on sort position
+  // When searching or sorting by non-ELO columns, calculate actual global ELO rank
+  const needsGlobalRank = search || sortBy !== 'openskill_elo';
+
+  const formattedPlayers = await Promise.all((players || []).map(async (p, idx) => {
+    let eloRank = offset + idx + 1; // Default: position-based rank
+
+    if (needsGlobalRank && p.openskill_elo) {
+      // Calculate global ELO rank: count players with higher ELO
+      const { count: higherCount } = await supabase
+        .from('leaderboard_stats')
+        .select('*', { count: 'exact', head: true })
+        .eq('period', precalcPeriod)
+        .eq('min_size', precalcMinSize)
+        .gt('openskill_elo', p.openskill_elo);
+      eloRank = (higherCount || 0) + 1;
+    }
+
+    return {
+      player_id: p.player_id,
+      player_name: p.player_name,
+      openskill_elo: p.openskill_elo,
+      entries: p.entries,
+      wins: p.total_wins,
+      losses: p.total_losses,
+      draws: p.total_draws,
+      conversions: p.conversions,
+      top4s: p.top4s,
+      championships: p.championships,
+      main_commander: p.main_commander,
+      commander_pct: p.commander_pct,
+      avg_placement_pct: p.avg_placement_pct,
+      win_rate: p.win_rate,
+      five_swiss: p.five_swiss,
+      conversion_rate: p.conversion_rate,
+      top4_rate: p.top4_rate,
+      champ_rate: p.champ_rate,
+      elo_rank: eloRank,
+    };
   }));
 
   // Get ELO stats from the full filtered set

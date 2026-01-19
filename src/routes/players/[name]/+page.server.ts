@@ -244,10 +244,22 @@ export const load: PageServerLoad = async ({ params, url }) => {
     champ_rate: periodStats.entries > 0 ? periodStats.championships / periodStats.entries : 0
   };
 
+  // Calculate global ELO rank (only if player has 10+ games)
+  let eloRank: number | null = null;
+  if (playerStats.openskill_games >= 10 && playerStats.openskill_elo) {
+    const { count } = await supabase
+      .from('players')
+      .select('*', { count: 'exact', head: true })
+      .gt('openskill_elo', playerStats.openskill_elo)
+      .gte('openskill_games', 10);
+    eloRank = (count || 0) + 1;
+  }
+
   return {
     playerName,
     playerId: playerStats.player_id,
     stats: playerStats,
+    eloRank,
     periodStats: enhancedPeriodStats,
     commanderStats,
     tournamentHistory,

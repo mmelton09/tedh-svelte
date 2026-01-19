@@ -209,10 +209,10 @@
     <div class="stat-value">
       {formatElo(data.stats.openskill_elo)}{#if isProvisional()}<span class="provisional" title="Provisional - high uncertainty">?</span>{/if}
     </div>
-    <div class="stat-label">ELO Rating</div>
+    <div class="stat-label">ELO{#if data.eloRank} (#{data.eloRank}){/if}</div>
   </div>
   <div class="stat-card">
-    <div class="stat-value">{data.stats.openskill_games || 0}</div>
+    <div class="stat-value">{data.periodStats.total_wins + data.periodStats.total_losses + data.periodStats.total_draws}</div>
     <div class="stat-label">Games</div>
   </div>
   <div class="stat-card">
