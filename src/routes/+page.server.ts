@@ -231,6 +231,7 @@ async function loadSingleTournament(
       deck_commanders (commander_name)
     `)
     .eq('tid', tid)
+    .or('wins.gt.0,losses.gt.0,draws.gt.0')
     .limit(10000);
 
   const commanders = await aggregateCommanderStats(entries || [], { [tid]: tournament });
@@ -309,6 +310,7 @@ async function loadLiveCalculation(
         deck_commanders (commander_name)
       `)
       .in('tid', batch)
+      .or('wins.gt.0,losses.gt.0,draws.gt.0')
       .limit(100000);
     if (batchEntries) {
       entries = entries.concat(batchEntries);

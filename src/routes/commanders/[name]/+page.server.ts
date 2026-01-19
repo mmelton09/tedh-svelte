@@ -369,6 +369,7 @@ async function calculateWeeklyTrends(commanderName: string, minSize: number) {
     .gte('tournaments.total_players', minSize)
     .eq('tournaments.is_league', false)
     .gte('tournaments.start_date', sixMonthsAgo.toISOString().split('T')[0])
+    .or('wins.gt.0,losses.gt.0,draws.gt.0')
     .limit(10000);
 
   // Filter to this commander and populate weekly data

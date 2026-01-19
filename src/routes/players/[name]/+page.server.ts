@@ -115,7 +115,8 @@ export const load: PageServerLoad = async ({ params, url }) => {
     `)
     .eq('player_id', playerStats.player_id)
     .gte('tournaments.total_players', minSize)
-    .eq('tournaments.is_league', false);
+    .eq('tournaments.is_league', false)
+    .or('wins.gt.0,losses.gt.0,draws.gt.0');
 
   // Apply date filters
   if (dateRange.start) {
