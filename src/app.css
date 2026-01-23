@@ -60,6 +60,12 @@ a:hover {
   position: relative;
 }
 
+.nav-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .nav-logo {
   position: relative;
   font-size: 1rem;

@@ -68,7 +68,7 @@ export const load: PageServerLoad = async ({ url }) => {
   const sortBy = url.searchParams.get('sort') || 'openskill_elo';
   const sortOrder = url.searchParams.get('order') || 'desc';
   const search = url.searchParams.get('search') || '';
-  const rankedOnly = url.searchParams.get('ranked') !== 'false';
+  const rankedOnly = url.searchParams.get('ranked') === 'true';
 
   const offset = (page - 1) * perPage;
 

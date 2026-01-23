@@ -21,15 +21,15 @@
     { href: '/leaderboard', label: 'Leaderboard' }
   ];
 
-  // Ranked vs All data toggle
-  let rankedOnly = $derived($page.url.searchParams.get('ranked') !== 'false');
+  // Ranked vs All data toggle (default: all)
+  let rankedOnly = $derived($page.url.searchParams.get('ranked') === 'true');
 
   function toggleRanked() {
     const params = new URLSearchParams($page.url.searchParams);
     if (rankedOnly) {
-      params.set('ranked', 'false');
-    } else {
       params.delete('ranked');
+    } else {
+      params.set('ranked', 'true');
     }
     goto(`${$page.url.pathname}?${params.toString()}`, { replaceState: true });
   }
@@ -42,10 +42,18 @@
 
 <nav class="nav">
   <div class="nav-container">
-    <a href="/" class="nav-logo">
-      <span class="t-accent">t</span>EDH Stats
-      <span class="beta-ribbon">BETA</span>
-    </a>
+    <div class="nav-left">
+      <a href="/" class="nav-logo">
+        <span class="t-accent">t</span>EDH Stats
+        <span class="beta-ribbon">BETA</span>
+      </a>
+      <button class="data-toggle" onclick={toggleRanked} title={rankedOnly ? 'Showing ranked players only (10+ games)' : 'Showing all players'}>
+        data:{rankedOnly ? 'ranked' : 'all'}
+      </button>
+      <span class="data-timestamp" title="Most recent tournament data">
+        ↻ {formatDataDate(data.dataUpdated)}
+      </span>
+    </div>
 
     <div class="nav-links">
       {#each navLinks as link}
@@ -60,12 +68,7 @@
     </div>
 
     <div class="nav-right">
-      <button class="data-toggle" onclick={toggleRanked} title={rankedOnly ? 'Showing ranked players only (10+ games)' : 'Showing all players'}>
-        data:{rankedOnly ? 'ranked' : 'all'}
-      </button>
-      <span class="data-timestamp" title="Most recent tournament data">
-        ↻ {formatDataDate(data.dataUpdated)}
-      </span>
+      <!-- Future: account dropdown -->
     </div>
   </div>
 </nav>
