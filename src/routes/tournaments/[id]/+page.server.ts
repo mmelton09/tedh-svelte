@@ -51,6 +51,66 @@ export const load: PageServerLoad = async ({ params, url }) => {
     .limit(1)
     .single();
 
+  // Calculate week boundaries for week navigation
+  const currentDate = new Date(tournament.start_date);
+  const dayOfWeek = currentDate.getUTCDay(); // 0 = Sunday
+  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const weekStart = new Date(currentDate);
+  weekStart.setUTCDate(currentDate.getUTCDate() - daysToMonday);
+  const weekStartStr = weekStart.toISOString().split('T')[0];
+
+  // Get first tournament of previous week (before current week's Monday)
+  const { data: prevWeekTournament } = await supabase
+    .from('tournaments')
+    .select('tid, tournament_name, total_players, start_date')
+    .gte('total_players', minSize)
+    .eq('is_league', false)
+    .lt('start_date', weekStartStr)
+    .order('start_date', { ascending: false })
+    .limit(1)
+    .single();
+
+  // If we found prev week's last tournament, find first of that week
+  let firstOfPrevWeek = null;
+  if (prevWeekTournament) {
+    const prevDate = new Date(prevWeekTournament.start_date);
+    const prevDayOfWeek = prevDate.getUTCDay();
+    const prevDaysToMonday = prevDayOfWeek === 0 ? 6 : prevDayOfWeek - 1;
+    const prevWeekStart = new Date(prevDate);
+    prevWeekStart.setUTCDate(prevDate.getUTCDate() - prevDaysToMonday);
+    const prevWeekEnd = new Date(prevWeekStart);
+    prevWeekEnd.setUTCDate(prevWeekStart.getUTCDate() + 7);
+
+    const { data: firstOfWeek } = await supabase
+      .from('tournaments')
+      .select('tid, tournament_name, total_players')
+      .gte('total_players', minSize)
+      .eq('is_league', false)
+      .gte('start_date', prevWeekStart.toISOString().split('T')[0])
+      .lt('start_date', prevWeekEnd.toISOString().split('T')[0])
+      .order('start_date', { ascending: true })
+      .limit(1)
+      .single();
+
+    firstOfPrevWeek = firstOfWeek;
+  }
+
+  // Get next week's Monday
+  const nextWeekStart = new Date(weekStart);
+  nextWeekStart.setUTCDate(weekStart.getUTCDate() + 7);
+  const nextWeekStartStr = nextWeekStart.toISOString().split('T')[0];
+
+  // Get first tournament of next week
+  const { data: firstOfNextWeek } = await supabase
+    .from('tournaments')
+    .select('tid, tournament_name, total_players')
+    .gte('total_players', minSize)
+    .eq('is_league', false)
+    .gte('start_date', nextWeekStartStr)
+    .order('start_date', { ascending: true })
+    .limit(1)
+    .single();
+
   // Get standings with player and commander info
   // Filter out 0-0-0 players (signed up but didn't attend)
   const { data: standings, error: standingsError } = await supabase
@@ -259,6 +319,8 @@ export const load: PageServerLoad = async ({ params, url }) => {
     standings: standings || [],
     prevTournament,
     nextTournament,
+    firstOfPrevWeek,
+    firstOfNextWeek,
     minSize,
     vsAvg,
     seatWinRates,

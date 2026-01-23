@@ -16,9 +16,14 @@
 
   function updateFilters(newMinSize?: number, newPage?: number) {
     const params = new URLSearchParams($page.url.searchParams);
-    if (newMinSize) params.set('min_size', newMinSize.toString());
-    if (newPage) params.set('page', newPage.toString());
-    goto(`?${params.toString()}`, { replaceState: true });
+    if (newMinSize !== undefined) {
+      params.set('min_size', newMinSize.toString());
+      params.set('page', '1'); // Reset to page 1 when changing filter
+    }
+    if (newPage !== undefined) {
+      params.set('page', newPage.toString());
+    }
+    goto(`?${params.toString()}`);
   }
 
   function formatDate(dateStr: string): string {

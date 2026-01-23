@@ -96,13 +96,23 @@
 
 <!-- Tournament Navigation -->
 <div class="tournament-nav">
-  <button
-    class="nav-btn"
-    disabled={!data.prevTournament}
-    onclick={() => data.prevTournament && navigateTo(data.prevTournament.tid)}
-  >
-    ← {data.prevTournament?.tournament_name?.slice(0, 30) || 'Previous'}
-  </button>
+  <div class="nav-col">
+    <button
+      class="nav-btn"
+      disabled={!data.prevTournament}
+      onclick={() => data.prevTournament && navigateTo(data.prevTournament.tid)}
+    >
+      ← {data.prevTournament?.tournament_name?.slice(0, 30) || 'Previous'}
+    </button>
+    <button
+      class="nav-btn nav-btn-week"
+      disabled={!data.firstOfPrevWeek}
+      onclick={() => data.firstOfPrevWeek && navigateTo(data.firstOfPrevWeek.tid)}
+      title={data.firstOfPrevWeek?.tournament_name || 'Previous week'}
+    >
+      «« Prev Week
+    </button>
+  </div>
 
   <div class="nav-center">
     <h1>{data.tournament.tournament_name}</h1>
@@ -121,13 +131,23 @@
     </div>
   </div>
 
-  <button
-    class="nav-btn"
-    disabled={!data.nextTournament}
-    onclick={() => data.nextTournament && navigateTo(data.nextTournament.tid)}
-  >
-    {data.nextTournament?.tournament_name?.slice(0, 30) || 'Next'} →
-  </button>
+  <div class="nav-col nav-col-right">
+    <button
+      class="nav-btn"
+      disabled={!data.nextTournament}
+      onclick={() => data.nextTournament && navigateTo(data.nextTournament.tid)}
+    >
+      {data.nextTournament?.tournament_name?.slice(0, 30) || 'Next'} →
+    </button>
+    <button
+      class="nav-btn nav-btn-week"
+      disabled={!data.firstOfNextWeek}
+      onclick={() => data.firstOfNextWeek && navigateTo(data.firstOfNextWeek.tid)}
+      title={data.firstOfNextWeek?.tournament_name || 'Next week'}
+    >
+      Next Week »»
+    </button>
+  </div>
 </div>
 
 <!-- Tournament Info -->
@@ -281,6 +301,17 @@
     border-radius: 8px;
   }
 
+  .nav-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-width: 200px;
+  }
+
+  .nav-col-right {
+    align-items: flex-end;
+  }
+
   .nav-btn {
     padding: 0.5rem 1rem;
     background: var(--bg-tertiary);
@@ -293,6 +324,12 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .nav-btn-week {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.75rem;
+    color: var(--text-secondary);
   }
 
   .nav-btn:hover:not(:disabled) {
@@ -537,6 +574,15 @@
   @media (max-width: 768px) {
     .tournament-nav {
       flex-direction: column;
+    }
+
+    .nav-col {
+      width: 100%;
+      min-width: 0;
+    }
+
+    .nav-col-right {
+      align-items: stretch;
     }
 
     .nav-btn {

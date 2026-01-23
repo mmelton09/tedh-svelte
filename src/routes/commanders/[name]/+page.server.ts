@@ -347,33 +347,76 @@ async function calculateWeeklyTrends(commanderName: string, minSize: number) {
     };
   }
 
-  // Fetch chart data
-  const { data: chartEntries } = await supabase
-    .from('tournament_entries')
-    .select(`
-      entry_id,
-      standing,
-      wins,
-      losses,
-      draws,
-      tournaments!inner (
-        tid,
-        start_date,
-        total_players,
-        top_cut
-      ),
-      deck_commanders (
-        commander_name
-      )
-    `)
-    .gte('tournaments.total_players', minSize)
-    .eq('tournaments.is_league', false)
-    .gte('tournaments.start_date', sixMonthsAgo.toISOString().split('T')[0])
-    .or('wins.gt.0,losses.gt.0,draws.gt.0')
-    .limit(10000);
+  // Get commander names to filter by
+  const commanderNames = commanderName.split(' / ').map(n => n.trim());
 
-  // Filter to this commander and populate weekly data
-  for (const entry of chartEntries || []) {
+  // First, get entry_ids for this commander from deck_commanders table
+  const { data: commanderEntries } = await supabase
+    .from('deck_commanders')
+    .select('entry_id')
+    .in('commander_name', commanderNames)
+    .limit(100000);
+
+  if (!commanderEntries || commanderEntries.length === 0) {
+    // Return empty weekly data as array
+    return Object.values(weeklyData).map((d: any) => ({
+      label: d.weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      fullLabel: d.weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      entries: 0,
+      winRate: 0,
+      winVsExpected: -25,
+      convRate: 0,
+      convVsExpected: -25,
+      top4Rate: 0,
+      top4VsExpected: -25,
+      champRate: 0,
+      champVsExpected: -25
+    }));
+  }
+
+  // Get unique entry_ids
+  const entryIds = [...new Set(commanderEntries.map(e => e.entry_id))];
+
+  // Batch fetch entries in chunks to avoid query limits
+  const BATCH_SIZE = 500;
+  const allChartEntries: any[] = [];
+
+  for (let i = 0; i < entryIds.length; i += BATCH_SIZE) {
+    const batchIds = entryIds.slice(i, i + BATCH_SIZE);
+
+    const { data: batchEntries } = await supabase
+      .from('tournament_entries')
+      .select(`
+        entry_id,
+        standing,
+        wins,
+        losses,
+        draws,
+        tournaments!inner (
+          tid,
+          start_date,
+          total_players,
+          top_cut,
+          is_league
+        ),
+        deck_commanders (
+          commander_name
+        )
+      `)
+      .in('entry_id', batchIds)
+      .gte('tournaments.total_players', minSize)
+      .eq('tournaments.is_league', false)
+      .gte('tournaments.start_date', sixMonthsAgo.toISOString().split('T')[0])
+      .or('wins.gt.0,losses.gt.0,draws.gt.0')
+      .limit(10000);
+
+    if (batchEntries) {
+      allChartEntries.push(...batchEntries);
+    }
+  }
+
+  // Filter to exact commander pair and populate weekly data
+  for (const entry of allChartEntries) {
     const commanders = (entry.deck_commanders as any[]) || [];
     const commanderPair = commanders
       .map((c: any) => c.commander_name)

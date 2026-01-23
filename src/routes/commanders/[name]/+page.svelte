@@ -281,6 +281,52 @@
     goto(`?${params.toString()}`, { replaceState: true });
   }
 
+  // Commander search state
+  let commanderSearch = $state('');
+  let commanderSuggestions = $state<string[]>([]);
+  let showSuggestions = $state(false);
+  let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  async function searchCommanders(query: string) {
+    if (query.length < 2) {
+      commanderSuggestions = [];
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/commander-search?q=${encodeURIComponent(query)}`);
+      if (response.ok) {
+        const results = await response.json();
+        commanderSuggestions = results.slice(0, 10);
+      }
+    } catch {
+      commanderSuggestions = [];
+    }
+  }
+
+  function handleSearchInput(e: Event) {
+    const value = (e.target as HTMLInputElement).value;
+    commanderSearch = value;
+    showSuggestions = true;
+
+    if (searchTimeout) clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => searchCommanders(value), 200);
+  }
+
+  function selectCommander(commander: string) {
+    commanderSearch = '';
+    commanderSuggestions = [];
+    showSuggestions = false;
+    goto(`/commanders/${encodeURIComponent(commander)}`);
+  }
+
+  function handleSearchKeydown(e: KeyboardEvent) {
+    if (e.key === 'Escape') {
+      showSuggestions = false;
+      commanderSearch = '';
+    }
+  }
+
   // Date range state
   let dateStart = $state(data.periodStart || '');
   let dateEnd = $state(data.periodEnd || '');
@@ -450,6 +496,28 @@
       </span>
     {/if}
   </h1>
+  <div class="commander-search">
+    <input
+      type="text"
+      placeholder="Search commanders..."
+      value={commanderSearch}
+      oninput={handleSearchInput}
+      onkeydown={handleSearchKeydown}
+      onfocus={() => showSuggestions = commanderSuggestions.length > 0}
+      onblur={() => setTimeout(() => showSuggestions = false, 200)}
+    />
+    {#if showSuggestions && commanderSuggestions.length > 0}
+      <ul class="suggestions">
+        {#each commanderSuggestions as suggestion}
+          <li>
+            <button type="button" onmousedown={() => selectCommander(suggestion)}>
+              {suggestion}
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </div>
 </div>
 
 <!-- Period Toggle -->
@@ -522,7 +590,7 @@
   Event Size:
   <select
     class="size-select"
-    value={data.minSize}
+    value={String(data.minSize)}
     onchange={(e) => updateMinSize(parseInt(e.currentTarget.value) || 16)}
   >
     <option value="16">16+</option>
@@ -810,6 +878,57 @@
     justify-content: center;
     gap: 0.75rem;
     flex-wrap: wrap;
+  }
+
+  .commander-search {
+    position: relative;
+    max-width: 300px;
+    margin: 0.5rem auto 0;
+  }
+
+  .commander-search input {
+    width: 100%;
+    padding: 0.4rem 0.75rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+  }
+
+  .commander-search input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .commander-search .suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-top: 4px;
+    list-style: none;
+    z-index: 100;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .commander-search .suggestions li button {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+
+  .commander-search .suggestions li button:hover {
+    background: var(--bg-tertiary);
   }
 
   @media (max-width: 900px) {
