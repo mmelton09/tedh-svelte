@@ -170,6 +170,8 @@ export const load: PageServerLoad = async ({ url }) => {
   const period = url.searchParams.get('period') || '1y';
   const minSize = parseInt(url.searchParams.get('min_size') || '50') || 50;
   const tid = url.searchParams.get('tid');
+  const rankedOnly = url.searchParams.get('ranked') === 'true';
+  const dataType = rankedOnly ? 'ranked' : 'all';
 
   // Top player filter params (used for live calculation fallback)
   const topMode = url.searchParams.get('top_mode') || 'off';
@@ -182,13 +184,19 @@ export const load: PageServerLoad = async ({ url }) => {
   const precalcMinSize = getClosestMinSize(minSize);
 
   // Fetch top tournaments by size for the featured bar
-  const { data: recentTournaments } = await supabase
+  let recentTournamentsQuery = supabase
     .from('tournaments')
     .select('tid, tournament_name, total_players, start_date')
     .gte('total_players', minSize)
     .eq('is_league', false)
     .gte('start_date', dateRange.start)
-    .lte('start_date', dateRange.end)
+    .lte('start_date', dateRange.end);
+
+  if (rankedOnly) {
+    recentTournamentsQuery = recentTournamentsQuery.eq('has_pod_data', true);
+  }
+
+  const { data: recentTournaments } = await recentTournamentsQuery
     .order('total_players', { ascending: false })
     .limit(50);
 
@@ -200,7 +208,7 @@ export const load: PageServerLoad = async ({ url }) => {
   // Use precalc table if available and no special filters
   if (precalcPeriod && topMode === 'off') {
     // Get tournament count for display
-    const { count: tournamentCount } = await supabase
+    let tournamentCountQuery = supabase
       .from('tournaments')
       .select('*', { count: 'exact', head: true })
       .gte('total_players', minSize)
@@ -208,12 +216,19 @@ export const load: PageServerLoad = async ({ url }) => {
       .gte('start_date', dateRange.start)
       .lte('start_date', dateRange.end);
 
+    if (rankedOnly) {
+      tournamentCountQuery = tournamentCountQuery.eq('has_pod_data', true);
+    }
+
+    const { count: tournamentCount } = await tournamentCountQuery;
+
     // Fetch from precalc table
     const { data: precalcCommanders, error } = await supabase
       .from('commander_stats')
       .select('*')
       .eq('period', precalcPeriod)
       .eq('min_size', precalcMinSize)
+      .eq('data_type', dataType)
       .order('entries', { ascending: false })
       .limit(10000);
 
