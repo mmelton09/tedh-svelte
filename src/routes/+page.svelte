@@ -25,7 +25,6 @@
 
   // Additional filters
   let top4Filter = $state('none');
-  let newOnly = $state(false);
   let sortByGains = $state(false);
 
   // Accordion state - track which rows are expanded and their tournament data
@@ -145,11 +144,6 @@
       } else if (type === 'win') {
         result = result.filter(c => (c.championships || 0) >= minVal);
       }
-    }
-
-    // New Only filter
-    if (newOnly) {
-      result = result.filter(c => c.is_new === true);
     }
 
     // Color filter
@@ -355,7 +349,6 @@
     top4Filter = 'none';
     colorW = colorU = colorB = colorR = colorG = colorC = false;
     colorMode = 'exactly';
-    newOnly = false;
     sortByGains = false;
     topFilterMode = 'off';
     topFilterValue = 'top';
@@ -471,11 +464,11 @@
         return ((c.win_rate || 0) * 5) + (drawRate * 1);
       }),
       conversions: calculateMedals(cmds, c => c.conversions || 0),
-      conversion_rate: calculateMedals(cmds, c => c.conversion_rate || 0),
+      conversion_rate: calculateMedals(cmds, c => c.conv_vs_expected || 0),
       top4s: calculateMedals(cmds, c => c.top4s || 0),
-      top4_rate: calculateMedals(cmds, c => c.top4_rate || 0),
+      top4_rate: calculateMedals(cmds, c => c.top4_vs_expected || 0),
       championships: calculateMedals(cmds, c => c.championships || 0),
-      champ_rate: calculateMedals(cmds, c => c.champ_rate || 0),
+      champ_rate: calculateMedals(cmds, c => c.champ_vs_expected || 0),
     };
   });
 
@@ -500,42 +493,13 @@
 <!-- Guide Panel -->
 {#if showGuide}
 <div class="guide-panel">
-  <div class="guide-section">
-    <h3>Table Columns</h3>
-    <div class="guide-grid">
-      <div class="guide-item"><strong>Entries</strong> <span>Tournament entries with this commander</span></div>
-      <div class="guide-item"><strong>Meta %</strong> <span>Share of total entries in filtered period</span></div>
-      <div class="guide-item"><strong>Win %</strong> <span>Pod win rate (wins / total games)</span></div>
-      <div class="guide-item"><strong>5wiss</strong> <span>Swiss score: (Win% x 5) + (Draw% x 1)</span></div>
-      <div class="guide-item"><strong>Conv</strong> <span>Number of top cut conversions</span></div>
-      <div class="guide-item"><strong>Conv %</strong> <span>Conversion rate to top cut</span></div>
-      <div class="guide-item"><strong>Top4</strong> <span>Number of top 4 finishes</span></div>
-      <div class="guide-item"><strong>Top4 %</strong> <span>Rate of finishing in top 4</span></div>
-      <div class="guide-item"><strong>🏆</strong> <span>Tournament wins (1st place)</span></div>
-      <div class="guide-item"><strong>🏆 %</strong> <span>Championship win rate</span></div>
-    </div>
-  </div>
-  <div class="guide-section">
-    <h3>Filters & Toggles</h3>
-    <div class="guide-grid">
-      <div class="guide-item"><strong>Event Size</strong> <span>Minimum tournament size (affects stats & meta %)</span></div>
-      <div class="guide-item"><strong>Entries</strong> <span>Minimum entries to show a commander</span></div>
-      <div class="guide-item"><strong>Conv</strong> <span>Minimum conversions to show</span></div>
-      <div class="guide-item"><strong>+/-Exp</strong> <span>Show performance vs expected (random chance)</span></div>
-      <div class="guide-item"><strong>Delta</strong> <span>Show/hide change from previous period</span></div>
-      <div class="guide-item"><strong>Medals</strong> <span>Show/hide top 3 ranking medals</span></div>
-      <div class="guide-item"><strong>Colors</strong> <span>Filter by color identity (Exact/Core/Within/Not)</span></div>
-    </div>
-  </div>
-  <div class="guide-section">
-    <h3>Time Periods</h3>
-    <div class="guide-grid">
-      <div class="guide-item"><strong>Last Week</strong> <span>Previous 7 days of tournaments</span></div>
-      <div class="guide-item"><strong>Months</strong> <span>Calendar month data</span></div>
-      <div class="guide-item"><strong>3mo/6mo/1yr</strong> <span>Rolling time windows</span></div>
-      <div class="guide-item"><strong>Post-RC</strong> <span>Since Sept 23, 2024 bans</span></div>
-      <div class="guide-item"><strong>All History</strong> <span>Complete tournament data</span></div>
-    </div>
+  <div class="guide-grid">
+    <div class="guide-item"><strong>5wiss</strong> <span>Swiss score: (Win% × 5) + (Draw% × 1). Simulates expected swiss points.</span></div>
+    <div class="guide-item"><strong>Color = + ⊆ ≠</strong> <span>= Exact match | + Must include | ⊆ Within colors | ≠ Exclude colors</span></div>
+    <div class="guide-item"><strong>±Exp</strong> <span>Performance vs expected (random chance). Positive = overperforming.</span></div>
+    <div class="guide-item"><strong>Δ Delta</strong> <span>Change from previous equivalent period (e.g. last 30d vs prior 30d).</span></div>
+    <div class="guide-item"><strong>🏅 Medals</strong> <span>Shows top 3 for each column. Conv/Top4/🏆 medals based on ±Exp.</span></div>
+    <div class="guide-item"><strong>↕ Gains</strong> <span>Sort by delta (change) instead of absolute value.</span></div>
   </div>
 </div>
 {/if}
@@ -685,6 +649,7 @@
 
 <!-- Filters -->
 <div class="filters">
+  <span class="filter-label">Entries</span>
   <select
     class:filter-active={minEntries > 1}
     bind:value={minEntries}
@@ -698,12 +663,13 @@
     <option value={50}>50+</option>
   </select>
 
+  <span class="filter-label">Conv</span>
   <select
     class:filter-active={minConv > 0}
     bind:value={minConv}
     title="Minimum conversions"
   >
-    <option value={0}>Conv</option>
+    <option value={0}>0+</option>
     <option value={1}>1+</option>
     <option value={2}>2+</option>
     <option value={3}>3+</option>
@@ -755,8 +721,7 @@
     <button class="pill" class:active={showVsExpected} onclick={() => showVsExpected = !showVsExpected} title="Show vs Expected values">±Exp</button>
     <button class="pill" class:active={showDelta} onclick={() => showDelta = !showDelta} title="Show period-over-period changes">Δ</button>
     <button class="pill" class:active={showMedals} onclick={() => showMedals = !showMedals} title="Show medals for top 3">🏅</button>
-    <button class="pill" class:active={newOnly} onclick={() => newOnly = !newOnly} title="Show only new commanders">New</button>
-    <button class="pill" class:active={sortByGains} onclick={() => sortByGains = !sortByGains} title="Sort by delta values">Gains</button>
+    <button class="pill" class:active={sortByGains} onclick={() => sortByGains = !sortByGains} title="Sort by delta values">↕Gains</button>
   </div>
 
   <div class="top-filter">
@@ -1003,14 +968,14 @@
                       </tr>
                     </thead>
                     <tbody>
-                      {#each tournamentData[cmd.commander_pair] as t}
+                      {#each [...tournamentData[cmd.commander_pair]].sort((a, b) => Math.min(...a.entries.map(e => e.standing)) - Math.min(...b.entries.map(e => e.standing))) as t}
                         <tr class="tournament-header">
                           <td>{formatTournamentDate(t.start_date)}</td>
                           <td><a href="/tournaments/{t.tid}">{t.tournament_name}</a></td>
                           <td class="metric">{t.total_players}</td>
                           <td class="metric">{t.entries.length}</td>
                         </tr>
-                        {#each t.entries as entry}
+                        {#each [...t.entries].sort((a, b) => a.standing - b.standing) as entry}
                           <tr class="entry-row" class:top-cut={t.top_cut && entry.standing <= t.top_cut}>
                             <td></td>
                             <td>
@@ -1408,6 +1373,11 @@
   .filters select.filter-active {
     border-color: var(--accent);
     box-shadow: 0 0 0 1px rgba(76, 175, 80, 0.25);
+  }
+
+  .filter-label {
+    color: var(--text-muted);
+    font-size: 0.8em;
   }
 
   /* Toggle pills */
