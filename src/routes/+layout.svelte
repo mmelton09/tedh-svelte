@@ -42,22 +42,10 @@
 
 <nav class="nav">
   <div class="nav-container">
-    <div class="nav-brand">
-      <div class="brand-top">
-        <a href="/" class="nav-logo">
-          <span class="t-accent">t</span>EDH Stats
-        </a>
-        <button class="data-toggle" onclick={toggleRanked} title={rankedOnly ? 'Showing ranked players only (10+ games)' : 'Showing all players'}>
-          data:{rankedOnly ? 'ranked' : 'all'}
-        </button>
-      </div>
-      <div class="brand-bottom">
-        <span class="beta-tag">BETA</span>
-        <span class="data-timestamp" title="Most recent tournament data">
-          ↻ {formatDataDate(data.dataUpdated)}
-        </span>
-      </div>
-    </div>
+    <a href="/" class="nav-logo">
+      <span class="t-accent">t</span>EDH Stats
+      <span class="beta-ribbon">BETA</span>
+    </a>
 
     <div class="nav-links">
       {#each navLinks as link}
@@ -69,6 +57,15 @@
           {link.label}
         </a>
       {/each}
+    </div>
+
+    <div class="nav-right">
+      <button class="data-toggle" onclick={toggleRanked} title={rankedOnly ? 'Showing ranked players only (10+ games)' : 'Showing all players'}>
+        data:{rankedOnly ? 'ranked' : 'all'}
+      </button>
+      <span class="data-timestamp" title="Most recent tournament data">
+        ↻ {formatDataDate(data.dataUpdated)}
+      </span>
     </div>
   </div>
 </nav>
