@@ -499,7 +499,7 @@
     <div class="guide-item"><strong>±Exp</strong> <span>Performance vs expected (random chance). Positive = overperforming.</span></div>
     <div class="guide-item"><strong>Δ Delta</strong> <span>Change from previous equivalent period (e.g. last 30d vs prior 30d).</span></div>
     <div class="guide-item"><strong>🏅 Medals</strong> <span>Shows top 3 for each column. Conv/Top4/🏆 medals based on ±Exp.</span></div>
-    <div class="guide-item"><strong>↕ Gains</strong> <span>Sort by delta (change) instead of absolute value.</span></div>
+    <div class="guide-item"><strong>↕</strong> <span>Sort by delta (appears when Δ is active).</span></div>
   </div>
 </div>
 {/if}
@@ -720,8 +720,10 @@
   <div class="toggle-pills">
     <button class="pill" class:active={showVsExpected} onclick={() => showVsExpected = !showVsExpected} title="Show vs Expected values">±Exp</button>
     <button class="pill" class:active={showDelta} onclick={() => showDelta = !showDelta} title="Show period-over-period changes">Δ</button>
+    {#if showDelta}
+      <button class="pill pill-small" class:active={sortByGains} onclick={() => sortByGains = !sortByGains} title="Sort by delta values">↕</button>
+    {/if}
     <button class="pill" class:active={showMedals} onclick={() => showMedals = !showMedals} title="Show medals for top 3">🏅</button>
-    <button class="pill" class:active={sortByGains} onclick={() => sortByGains = !sortByGains} title="Sort by delta values">↕Gains</button>
   </div>
 
   <div class="top-filter">
@@ -1407,6 +1409,11 @@
     background: var(--accent);
     border-color: var(--accent);
     color: var(--bg-primary);
+  }
+
+  .pill-small {
+    padding: 5px 8px;
+    min-width: auto;
   }
 
   /* Color filter */
