@@ -1,9 +1,12 @@
 <script lang="ts">
   import '../app.css';
-  import { page } from '$app/stores';
+  import { page, navigating } from '$app/stores';
   import { goto } from '$app/navigation';
 
   let { children, data } = $props();
+
+  // Show loading indicator when navigating (includes filter changes)
+  let isLoading = $derived(!!$navigating);
 
   function formatDataDate(dateStr: string | null): string {
     if (!dateStr) return 'Unknown';
@@ -70,6 +73,33 @@
   </div>
 </nav>
 
+{#if isLoading}
+  <div class="loading-bar"></div>
+{/if}
+
 <main class="main">
   {@render children()}
 </main>
+
+<style>
+  .loading-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent) 0%, var(--accent) 30%, transparent 30%);
+    background-size: 200% 100%;
+    animation: loading 1s ease-in-out infinite;
+    z-index: 9999;
+  }
+
+  @keyframes loading {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+</style>

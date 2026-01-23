@@ -11,13 +11,17 @@ const PRECALC_PERIODS: Record<string, string> = {
   'post_ban': 'post_ban',
 };
 
-// Map periods for delta lookup (current -> previous)
-const DELTA_PERIOD_MAP: Record<string, string> = {
-  '1y': '1y',    // Compare 1y to previous 1y
-  '6m': '6m',
-  '3m': '3m',
-  '1m': '1m',
-  'post_ban': 'post_ban',
+// Map periods to their comparison periods for delta calculation
+// For month views: compare to previous month
+// For rolling periods: compare to same length period ending at start of current
+const COMPARISON_PERIODS: Record<string, string> = {
+  'current_month': 'prev_month',
+  'prev_month': 'prev_month_2',
+  '1m': '1m_prev',      // Will calculate dynamically
+  '3m': '3m_prev',
+  '6m': '6m_prev',
+  '1y': '1y_prev',
+  // 'all' and 'post_ban' have no comparison
 };
 
 // Valid min sizes in precalc table
@@ -103,6 +107,65 @@ function getDateRange(period: string): { start: string; end: string; label: stri
   return { start: start.toISOString().split('T')[0], end, label };
 }
 
+// Get comparison period date range for delta calculation
+function getComparisonDateRange(period: string): { start: string; end: string } | null {
+  const now = new Date();
+
+  switch (period) {
+    case 'current_month': {
+      // Compare to previous month
+      const prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const prevEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+      return { start: prevStart.toISOString().split('T')[0], end: prevEnd.toISOString().split('T')[0] };
+    }
+    case 'prev_month': {
+      // Compare to two months ago
+      const prevStart = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+      const prevEnd = new Date(now.getFullYear(), now.getMonth() - 1, 0);
+      return { start: prevStart.toISOString().split('T')[0], end: prevEnd.toISOString().split('T')[0] };
+    }
+    case 'prev_month_2': {
+      // Compare to three months ago
+      const prevStart = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+      const prevEnd = new Date(now.getFullYear(), now.getMonth() - 2, 0);
+      return { start: prevStart.toISOString().split('T')[0], end: prevEnd.toISOString().split('T')[0] };
+    }
+    case 'last_week': {
+      // Compare to the week before last
+      const prevEnd = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const prevStart = new Date(prevEnd.getTime() - 7 * 24 * 60 * 60 * 1000);
+      return { start: prevStart.toISOString().split('T')[0], end: prevEnd.toISOString().split('T')[0] };
+    }
+    case '1m': {
+      // 30 days ending at current period start
+      const currentStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const prevEnd = new Date(currentStart.getTime() - 1);
+      const prevStart = new Date(prevEnd.getTime() - 30 * 24 * 60 * 60 * 1000);
+      return { start: prevStart.toISOString().split('T')[0], end: prevEnd.toISOString().split('T')[0] };
+    }
+    case '3m': {
+      const currentStart = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+      const prevEnd = new Date(currentStart.getTime() - 1);
+      const prevStart = new Date(prevEnd.getTime() - 90 * 24 * 60 * 60 * 1000);
+      return { start: prevStart.toISOString().split('T')[0], end: prevEnd.toISOString().split('T')[0] };
+    }
+    case '6m': {
+      const currentStart = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
+      const prevEnd = new Date(currentStart.getTime() - 1);
+      const prevStart = new Date(prevEnd.getTime() - 180 * 24 * 60 * 60 * 1000);
+      return { start: prevStart.toISOString().split('T')[0], end: prevEnd.toISOString().split('T')[0] };
+    }
+    case '1y': {
+      const currentStart = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+      const prevEnd = new Date(currentStart.getTime() - 1);
+      const prevStart = new Date(prevEnd.getTime() - 365 * 24 * 60 * 60 * 1000);
+      return { start: prevStart.toISOString().split('T')[0], end: prevEnd.toISOString().split('T')[0] };
+    }
+    default:
+      return null; // 'all', 'post_ban', 'custom' have no comparison
+  }
+}
+
 export const load: PageServerLoad = async ({ url }) => {
   const period = url.searchParams.get('period') || '1y';
   const minSize = parseInt(url.searchParams.get('min_size') || '50') || 50;
@@ -159,11 +222,7 @@ export const load: PageServerLoad = async ({ url }) => {
     }
 
     if (precalcCommanders && precalcCommanders.length > 0) {
-      // For delta calculation, we can compare to current period stats
-      // but that requires knowing what each commander's "previous" stats were
-      // For now, we'll skip delta for precalc (it's complex without storing both periods)
-      // The delta would need to compare current period to previous same-length period
-
+      // Use precalculated deltas directly from the table
       const commanders = precalcCommanders.map((cmd: any) => ({
         commander_pair: cmd.commander_pair,
         color_identity: cmd.color_identity || 'C',
@@ -182,13 +241,12 @@ export const load: PageServerLoad = async ({ url }) => {
         conv_vs_expected: Number(cmd.conv_vs_expected) || 0,
         top4_vs_expected: Number(cmd.top4_vs_expected) || 0,
         champ_vs_expected: Number(cmd.champ_vs_expected) || 0,
-        // Delta fields - not available from precalc yet
-        is_new: false,
-        delta_entries: null,
-        delta_win_rate: null,
-        delta_conv_rate: null,
-        delta_top4_rate: null,
-        delta_champ_rate: null,
+        is_new: cmd.is_new || false,
+        delta_entries: cmd.delta_entries,
+        delta_win_rate: cmd.delta_win_rate != null ? Number(cmd.delta_win_rate) : null,
+        delta_conv_rate: cmd.delta_conv_rate != null ? Number(cmd.delta_conv_rate) : null,
+        delta_top4_rate: cmd.delta_top4_rate != null ? Number(cmd.delta_top4_rate) : null,
+        delta_champ_rate: cmd.delta_champ_rate != null ? Number(cmd.delta_champ_rate) : null,
       }));
 
       const totalEntries = commanders.reduce((sum: number, c: any) => sum + c.entries, 0);
@@ -359,16 +417,55 @@ async function loadLiveCalculation(
   const commanders = await aggregateCommanderStats(entries || [], tournamentMap);
   const totalEntries = commanders.reduce((sum, c) => sum + c.entries, 0);
 
-  return {
-    commanders: commanders.map(cmd => ({
+  // Fetch comparison period data for delta calculation
+  const comparisonRange = getComparisonDateRange(period);
+  let comparisonMap: Record<string, any> = {};
+
+  if (comparisonRange) {
+    const compStats = await fetchComparisonStats(
+      comparisonRange.start,
+      comparisonRange.end,
+      minSize
+    );
+    for (const cmd of compStats) {
+      comparisonMap[cmd.commander_pair] = cmd;
+    }
+  }
+
+  const commandersWithDelta = commanders.map(cmd => {
+    const comp = comparisonMap[cmd.commander_pair];
+
+    let deltaEntries: number | null = null;
+    let deltaWinRate: number | null = null;
+    let deltaConvRate: number | null = null;
+    let deltaTop4Rate: number | null = null;
+    let deltaChampRate: number | null = null;
+    let isNew = false;
+
+    if (comp) {
+      deltaEntries = cmd.entries - comp.entries;
+      deltaWinRate = cmd.win_rate - comp.win_rate;
+      deltaConvRate = cmd.conversion_rate - comp.conversion_rate;
+      deltaTop4Rate = cmd.top4_rate - comp.top4_rate;
+      deltaChampRate = cmd.champ_rate - comp.champ_rate;
+    } else if (comparisonRange) {
+      isNew = true;
+      deltaEntries = cmd.entries;
+    }
+
+    return {
       ...cmd,
-      is_new: false,
-      delta_entries: null,
-      delta_win_rate: null,
-      delta_conv_rate: null,
-      delta_top4_rate: null,
-      delta_champ_rate: null,
-    })),
+      is_new: isNew,
+      delta_entries: deltaEntries,
+      delta_win_rate: deltaWinRate,
+      delta_conv_rate: deltaConvRate,
+      delta_top4_rate: deltaTop4Rate,
+      delta_champ_rate: deltaChampRate,
+    };
+  });
+
+  return {
+    commanders: commandersWithDelta,
     totalEntries,
     period,
     minSize,
@@ -542,4 +639,111 @@ async function aggregateCommanderStats(
       champ_vs_expected: champVsExpected,
     };
   }).sort((a, b) => b.entries - a.entries);
+}
+
+// Fetch comparison period stats for delta calculation
+async function fetchComparisonStats(
+  startDate: string,
+  endDate: string,
+  minSize: number
+): Promise<any[]> {
+  // Get tournaments in comparison date range
+  const { data: tournaments } = await supabase
+    .from('tournaments')
+    .select('tid, top_cut, total_players')
+    .gte('start_date', startDate)
+    .lte('start_date', endDate)
+    .gte('total_players', minSize)
+    .eq('is_league', false)
+    .limit(10000);
+
+  if (!tournaments || tournaments.length === 0) {
+    return [];
+  }
+
+  const tournamentIds = tournaments.map(t => t.tid);
+  const tournamentMap: Record<string, { top_cut: number; total_players: number }> = {};
+  for (const t of tournaments) {
+    tournamentMap[t.tid] = { top_cut: t.top_cut, total_players: t.total_players };
+  }
+
+  // Get all entries (batch to avoid .in() limits)
+  const BATCH_SIZE = 100;
+  let entries: any[] = [];
+  for (let i = 0; i < tournamentIds.length; i += BATCH_SIZE) {
+    const batch = tournamentIds.slice(i, i + BATCH_SIZE);
+    const { data: batchEntries } = await supabase
+      .from('tournament_entries')
+      .select(`
+        entry_id,
+        tid,
+        player_id,
+        wins,
+        losses,
+        draws,
+        standing,
+        deck_commanders (commander_name)
+      `)
+      .in('tid', batch)
+      .or('wins.gt.0,losses.gt.0,draws.gt.0')
+      .limit(100000);
+    if (batchEntries) {
+      entries = entries.concat(batchEntries);
+    }
+  }
+
+  // Aggregate into commander stats (simplified version without color identity)
+  const commanderStats: Record<string, any> = {};
+
+  for (const entry of entries) {
+    const commanders = (entry.deck_commanders as any[]) || [];
+    const commanderPair = commanders
+      .map((c: any) => c.commander_name)
+      .sort()
+      .join(' / ');
+
+    if (!commanderPair) continue;
+
+    if (!commanderStats[commanderPair]) {
+      commanderStats[commanderPair] = {
+        commander_pair: commanderPair,
+        entries: 0,
+        total_wins: 0,
+        total_losses: 0,
+        total_draws: 0,
+        conversions: 0,
+        top4s: 0,
+        championships: 0,
+      };
+    }
+
+    const stats = commanderStats[commanderPair];
+    stats.entries++;
+    stats.total_wins += entry.wins || 0;
+    stats.total_losses += entry.losses || 0;
+    stats.total_draws += entry.draws || 0;
+
+    const tournament = tournamentMap[entry.tid];
+    if (tournament?.top_cut && entry.standing <= tournament.top_cut) {
+      stats.conversions++;
+    }
+    if (entry.standing <= 4 && tournament?.top_cut && tournament.top_cut >= 4) {
+      stats.top4s++;
+    }
+    if (entry.standing === 1) {
+      stats.championships++;
+    }
+  }
+
+  return Object.values(commanderStats).map((stats: any) => {
+    const totalGames = stats.total_wins + stats.total_losses + stats.total_draws;
+    return {
+      commander_pair: stats.commander_pair,
+      entries: stats.entries,
+      win_rate: totalGames > 0 ? stats.total_wins / totalGames : 0,
+      conversion_rate: stats.entries > 0 ? stats.conversions / stats.entries : 0,
+      top4_rate: stats.entries > 0 ? stats.top4s / stats.entries : 0,
+      champ_rate: stats.entries > 0 ? stats.championships / stats.entries : 0,
+    };
+  });
 }

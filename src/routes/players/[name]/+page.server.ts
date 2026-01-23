@@ -25,6 +25,11 @@ function getDateRange(period: string): { start: string | null; end: string | nul
       const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
       return { start: prevMonthStart.toISOString().split('T')[0], end: prevMonthEnd.toISOString().split('T')[0] };
     }
+    case '1m': {
+      const oneMonth = new Date(now);
+      oneMonth.setDate(oneMonth.getDate() - 30);
+      return { start: oneMonth.toISOString().split('T')[0], end: null };
+    }
     case '3m': {
       const threeMonths = new Date(now);
       threeMonths.setMonth(threeMonths.getMonth() - 3);
@@ -47,7 +52,7 @@ function getDateRange(period: string): { start: string | null; end: string | nul
 
 export const load: PageServerLoad = async ({ params, url }) => {
   const identifier = decodeURIComponent(params.name);
-  const minSize = parseInt(url.searchParams.get('min_size') || '50') || 50;
+  const minSize = parseInt(url.searchParams.get('min_size') || '16') || 16;
   const period = url.searchParams.get('period') || 'all';
   const dateRange = getDateRange(period);
 

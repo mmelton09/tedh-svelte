@@ -32,6 +32,33 @@ function getPeriodLabel(period: string): string {
   return labels[period] || period;
 }
 
+// Wilson Score Lower Bound (95% CI) - penalizes low sample sizes
+function wilsonLower(wins: number, games: number, z = 1.96): number {
+  if (games === 0) return 0;
+  const p = wins / games;
+  const denominator = 1 + z * z / games;
+  const centre = p + z * z / (2 * games);
+  const adjustment = z * Math.sqrt((p * (1 - p) + z * z / (4 * games)) / games);
+  return Math.max(0, (centre - adjustment) / denominator);
+}
+
+// Bayesian Win Rate - regresses toward 25% mean based on sample size
+function bayesianWinRate(wins: number, games: number, priorGames = 30): number {
+  const priorWinRate = 0.25;
+  const priorWins = priorGames * priorWinRate;
+  return (wins + priorWins) / (games + priorGames);
+}
+
+// Player tier based on games played (fixed thresholds with best predictive power)
+const PROVEN_THRESHOLD = 50;  // 50+ games - best correlation (0.494)
+const RISING_THRESHOLD = 30;  // 30+ games
+
+function getPlayerTier(games: number): 'proven' | 'rising' | 'provisional' {
+  if (games >= PROVEN_THRESHOLD) return 'proven';
+  if (games >= RISING_THRESHOLD) return 'rising';
+  return 'provisional';
+}
+
 export const load: PageServerLoad = async ({ url }) => {
   const page = parseInt(url.searchParams.get('page') || '1');
   const perPage = parseInt(url.searchParams.get('per_page') || '100') || 100;
@@ -97,6 +124,11 @@ export const load: PageServerLoad = async ({ url }) => {
     .eq('period', precalcPeriod)
     .eq('min_size', precalcMinSize);
 
+  // Apply ranked filter (10+ games)
+  if (rankedOnly) {
+    query = query.gte('openskill_games', 10);
+  }
+
   // Apply min entries filter
   if (minEntries > 1) {
     query = query.gte('entries', minEntries);
@@ -147,6 +179,33 @@ export const load: PageServerLoad = async ({ url }) => {
   const totalCount = count || 0;
   const totalPages = Math.ceil(totalCount / perPage);
 
+  // Calculate what percentile the fixed thresholds represent
+  let gamesQuery = supabase
+    .from('leaderboard_stats')
+    .select('total_wins, total_losses, total_draws')
+    .eq('period', precalcPeriod)
+    .eq('min_size', precalcMinSize)
+    .gte('entries', minEntries);
+
+  if (rankedOnly) {
+    gamesQuery = gamesQuery.gte('openskill_games', 10);
+  }
+
+  const { data: gamesData } = await gamesQuery.limit(100000);
+
+  const allGames = (gamesData || [])
+    .map(p => (p.total_wins || 0) + (p.total_losses || 0) + (p.total_draws || 0))
+    .filter(g => g > 0)
+    .sort((a, b) => a - b);
+
+  // Calculate percentile for each threshold (what % of players are BELOW this threshold)
+  const provenPct = allGames.length > 0
+    ? Math.round((allGames.filter(g => g < PROVEN_THRESHOLD).length / allGames.length) * 100)
+    : 0;
+  const risingPct = allGames.length > 0
+    ? Math.round((allGames.filter(g => g < RISING_THRESHOLD).length / allGames.length) * 100)
+    : 0;
+
   // Calculate ELO ranks for display
   // When searching or sorting by non-ELO columns, calculate actual global ELO rank
   const needsGlobalRank = search || sortBy !== 'openskill_elo';
@@ -156,14 +215,22 @@ export const load: PageServerLoad = async ({ url }) => {
 
     if (needsGlobalRank && p.openskill_elo) {
       // Calculate global ELO rank: count players with higher ELO
-      const { count: higherCount } = await supabase
+      let rankQuery = supabase
         .from('leaderboard_stats')
         .select('*', { count: 'exact', head: true })
         .eq('period', precalcPeriod)
         .eq('min_size', precalcMinSize)
         .gt('openskill_elo', p.openskill_elo);
+
+      if (rankedOnly) {
+        rankQuery = rankQuery.gte('openskill_games', 10);
+      }
+
+      const { count: higherCount } = await rankQuery;
       eloRank = (higherCount || 0) + 1;
     }
+
+    const games = (p.total_wins || 0) + (p.total_losses || 0) + (p.total_draws || 0);
 
     return {
       player_id: p.player_id,
@@ -173,6 +240,7 @@ export const load: PageServerLoad = async ({ url }) => {
       wins: p.total_wins,
       losses: p.total_losses,
       draws: p.total_draws,
+      games,
       conversions: p.conversions,
       top4s: p.top4s,
       championships: p.championships,
@@ -180,6 +248,9 @@ export const load: PageServerLoad = async ({ url }) => {
       commander_pct: p.commander_pct,
       avg_placement_pct: p.avg_placement_pct,
       win_rate: p.win_rate,
+      bayesian_win_rate: bayesianWinRate(p.total_wins || 0, games),
+      wilson_win_rate: wilsonLower(p.total_wins || 0, games),
+      tier: getPlayerTier(games),
       five_swiss: p.five_swiss,
       conversion_rate: p.conversion_rate,
       top4_rate: p.top4_rate,
@@ -189,13 +260,19 @@ export const load: PageServerLoad = async ({ url }) => {
   }));
 
   // Get ELO stats from the full filtered set
-  const { data: statsData } = await supabase
+  let statsQuery = supabase
     .from('leaderboard_stats')
     .select('openskill_elo')
     .eq('period', precalcPeriod)
     .eq('min_size', precalcMinSize)
     .gte('entries', minEntries)
     .not('openskill_elo', 'is', null);
+
+  if (rankedOnly) {
+    statsQuery = statsQuery.gte('openskill_games', 10);
+  }
+
+  const { data: statsData } = await statsQuery;
 
   const eloValues = (statsData || []).map(p => p.openskill_elo).filter(e => e != null) as number[];
   const avgElo = eloValues.length > 0 ? eloValues.reduce((a, b) => a + b, 0) / eloValues.length : null;
@@ -218,5 +295,11 @@ export const load: PageServerLoad = async ({ url }) => {
     maxElo,
     periodLabel: getPeriodLabel(period),
     usingPrecalc: true,
+    tierThresholds: {
+      provenGames: PROVEN_THRESHOLD,
+      risingGames: RISING_THRESHOLD,
+      provenPct,
+      risingPct
+    },
   };
 };

@@ -187,10 +187,10 @@
   Event Size:
   <select
     class="size-select"
-    value={data.minSize}
+    value={String(data.minSize)}
     onchange={(e) => updateMinSize(parseInt(e.currentTarget.value) || 16)}
   >
-    <option value="16">All</option>
+    <option value="16">16+ (All)</option>
     <option value="30">30+</option>
     <option value="50">50+</option>
     <option value="100">100+</option>

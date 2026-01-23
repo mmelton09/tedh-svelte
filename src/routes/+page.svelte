@@ -412,6 +412,78 @@
     };
     return labels[period] || period;
   }
+
+  // Calculate medal positions with Olympic-style tie handling
+  // Returns a map of commander_pair -> medal class ('gold', 'silver', 'bronze', or null)
+  function calculateMedals(commanders: any[], getValue: (cmd: any) => number): Map<string, string | null> {
+    const medals = new Map<string, string | null>();
+
+    // Get values and sort
+    const items = commanders.map(cmd => ({ pair: cmd.commander_pair, val: getValue(cmd) }));
+    const sorted = [...items].sort((a, b) => b.val - a.val);
+
+    // Calculate actual position for each value (Olympic-style: ties skip positions)
+    const valToPosition: Record<number, number> = {};
+    let position = 1;
+    let lastVal: number | null = null;
+    let countAtLastVal = 0;
+
+    for (const item of sorted) {
+      if (item.val !== lastVal) {
+        if (lastVal !== null) {
+          position += countAtLastVal;
+        }
+        lastVal = item.val;
+        countAtLastVal = 1;
+        if (item.val > 0) valToPosition[item.val] = position;
+      } else {
+        countAtLastVal++;
+      }
+    }
+
+    // Assign medals based on position
+    for (const item of items) {
+      const pos = valToPosition[item.val];
+      if (pos === 1) {
+        medals.set(item.pair, 'gold');
+      } else if (pos === 2) {
+        medals.set(item.pair, 'silver');
+      } else if (pos === 3) {
+        medals.set(item.pair, 'bronze');
+      } else {
+        medals.set(item.pair, null);
+      }
+    }
+
+    return medals;
+  }
+
+  // Calculate medals for each column
+  let columnMedals = $derived(() => {
+    const cmds = filteredCommanders();
+    return {
+      entries: calculateMedals(cmds, c => c.entries),
+      meta_pct: calculateMedals(cmds, c => c.entries), // Same as entries since meta% is proportional
+      win_rate: calculateMedals(cmds, c => c.win_rate || 0),
+      swiss5: calculateMedals(cmds, c => {
+        const totalGames = c.total_wins + c.total_losses + c.total_draws;
+        const drawRate = totalGames > 0 ? c.total_draws / totalGames : 0;
+        return ((c.win_rate || 0) * 5) + (drawRate * 1);
+      }),
+      conversions: calculateMedals(cmds, c => c.conversions || 0),
+      conversion_rate: calculateMedals(cmds, c => c.conversion_rate || 0),
+      top4s: calculateMedals(cmds, c => c.top4s || 0),
+      top4_rate: calculateMedals(cmds, c => c.top4_rate || 0),
+      championships: calculateMedals(cmds, c => c.championships || 0),
+      champ_rate: calculateMedals(cmds, c => c.champ_rate || 0),
+    };
+  });
+
+  function getMedalClass(column: string, commanderPair: string): string {
+    const medal = columnMedals()[column as keyof typeof columnMedals]?.get(commanderPair);
+    if (!medal) return '';
+    return `stat-${medal}`;
+  }
 </script>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/mana-font@latest/css/mana.min.css">
@@ -852,11 +924,7 @@
               <i class="ms ms-c ms-cost"></i>
             {/if}
           </td>
-          <td class="metric"
-              class:stat-gold={showMedals && rank === 1}
-              class:stat-silver={showMedals && rank === 2}
-              class:stat-bronze={showMedals && rank === 3}
-          >
+          <td class="metric {showMedals ? getMedalClass('entries', cmd.commander_pair) : ''}">
             {cmd.entries}
             {#if showDelta && cmd.delta_entries != null}
               <span class="delta" class:positive={cmd.delta_entries > 0} class:negative={cmd.delta_entries < 0}>
@@ -867,8 +935,8 @@
               <span class="new-badge">NEW</span>
             {/if}
           </td>
-          <td class="metric">{((cmd.entries / filteredTotalEntries) * 100).toFixed(1)}%</td>
-          <td class="metric">
+          <td class="metric {showMedals ? getMedalClass('meta_pct', cmd.commander_pair) : ''}">{((cmd.entries / filteredTotalEntries) * 100).toFixed(1)}%</td>
+          <td class="metric {showMedals ? getMedalClass('win_rate', cmd.commander_pair) : ''}">
             {formatPct(cmd.win_rate, 1)}
             {#if showDelta && cmd.delta_win_rate != null}
               <span class="delta" class:positive={cmd.delta_win_rate > 0} class:negative={cmd.delta_win_rate < 0}>
@@ -876,9 +944,9 @@
               </span>
             {/if}
           </td>
-          <td class="metric">{formatSwiss5(cmd.win_rate || 0, drawRate)}</td>
-          <td class="metric">{cmd.conversions}</td>
-          <td class="metric">
+          <td class="metric {showMedals ? getMedalClass('swiss5', cmd.commander_pair) : ''}">{formatSwiss5(cmd.win_rate || 0, drawRate)}</td>
+          <td class="metric {showMedals ? getMedalClass('conversions', cmd.commander_pair) : ''}">{cmd.conversions}</td>
+          <td class="metric {showMedals ? getMedalClass('conversion_rate', cmd.commander_pair) : ''}">
             {#if showVsExpected}
               <span class="vs-exp {getVsExpClass(cmd.conv_vs_expected)}">{formatVsExp(cmd.conv_vs_expected)}</span>
             {:else}
@@ -890,8 +958,8 @@
               </span>
             {/if}
           </td>
-          <td class="metric">{cmd.top4s}</td>
-          <td class="metric">
+          <td class="metric {showMedals ? getMedalClass('top4s', cmd.commander_pair) : ''}">{cmd.top4s}</td>
+          <td class="metric {showMedals ? getMedalClass('top4_rate', cmd.commander_pair) : ''}">
             {#if showVsExpected}
               <span class="vs-exp {getVsExpClass(cmd.top4_vs_expected)}">{formatVsExp(cmd.top4_vs_expected)}</span>
             {:else}
@@ -903,8 +971,8 @@
               </span>
             {/if}
           </td>
-          <td class="metric">{cmd.championships}</td>
-          <td class="metric">
+          <td class="metric {showMedals ? getMedalClass('championships', cmd.commander_pair) : ''}">{cmd.championships}</td>
+          <td class="metric {showMedals ? getMedalClass('champ_rate', cmd.commander_pair) : ''}">
             {#if showVsExpected}
               <span class="vs-exp {getVsExpClass(cmd.champ_vs_expected)}">{formatVsExp(cmd.champ_vs_expected)}</span>
             {:else}
