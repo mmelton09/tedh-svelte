@@ -39,14 +39,59 @@
 
   function getCommanderPair(entry: any): string {
     const commanders = (entry.deck_commanders as any[]) || [];
-    return commanders.map((c: any) => c.commander_name).sort().join(' / ') || '-';
+    if (commanders.length > 0) {
+      return commanders.map((c: any) => c.commander_name).sort().join(' / ');
+    }
+    // Fall back to inferred deck
+    const playerId = getPlayerId(entry);
+    const inferred = data.inferredDeckMap?.[playerId];
+    if (inferred?.commanders?.length > 0) {
+      return inferred.commanders.sort().join(' / ');
+    }
+    return '-';
+  }
+
+  function hasInferredDeck(entry: any): boolean {
+    const commanders = (entry.deck_commanders as any[]) || [];
+    if (commanders.length > 0) return false;
+    const playerId = getPlayerId(entry);
+    const inferred = data.inferredDeckMap?.[playerId];
+    return !!(inferred?.commanders?.length > 0);
+  }
+
+  function getInferredDeckUrl(entry: any): string | null {
+    const playerId = getPlayerId(entry);
+    const inferred = data.inferredDeckMap?.[playerId];
+    return inferred?.deck_url || null;
+  }
+
+  function getInferredDeckUpdated(entry: any): string | null {
+    const playerId = getPlayerId(entry);
+    const inferred = data.inferredDeckMap?.[playerId];
+    if (inferred?.last_updated) {
+      return new Date(inferred.last_updated).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+    return null;
   }
 
   function getCommanderColorIdentity(entry: any): string {
     const commanders = (entry.deck_commanders as any[]) || [];
+    let commanderNames: string[] = [];
+
+    if (commanders.length > 0) {
+      commanderNames = commanders.map((c: any) => c.commander_name);
+    } else {
+      // Use inferred deck commanders
+      const playerId = getPlayerId(entry);
+      const inferred = data.inferredDeckMap?.[playerId];
+      if (inferred?.commanders?.length > 0) {
+        commanderNames = inferred.commanders;
+      }
+    }
+
     let allColors = '';
-    for (const c of commanders) {
-      const colors = data.colorMap?.[c.commander_name] || '';
+    for (const cmdName of commanderNames) {
+      const colors = data.colorMap?.[cmdName] || '';
       for (const color of colors) {
         if (!allColors.includes(color)) {
           allColors += color;
@@ -256,10 +301,18 @@
               <i class="ms ms-{color.toLowerCase()} ms-cost"></i>
             {/each}
           </td>
-          <td class="commander-col">
-            <a href="/commanders/{encodeURIComponent(getCommanderPair(entry))}" onclick={(e) => e.stopPropagation()}>
-              {getCommanderPair(entry)}
-            </a>
+          <td class="commander-col" class:inferred={hasInferredDeck(entry)}>
+            {#if hasInferredDeck(entry)}
+              <a href={getInferredDeckUrl(entry) || '#'} target="_blank" rel="noopener" onclick={(e) => e.stopPropagation()} title="Inferred from Moxfield (updated {getInferredDeckUpdated(entry)})">
+                {getCommanderPair(entry)} <span class="inferred-badge">?</span>
+              </a>
+            {:else if getCommanderPair(entry) !== '-'}
+              <a href="/commanders/{encodeURIComponent(getCommanderPair(entry))}" onclick={(e) => e.stopPropagation()}>
+                {getCommanderPair(entry)}
+              </a>
+            {:else}
+              -
+            {/if}
           </td>
           <td class="metric">{formatRecord(entry)}</td>
           <td class="list-cell" onclick={(e) => e.stopPropagation()}>
@@ -547,6 +600,27 @@
 
   .commander-col a:hover {
     color: var(--accent);
+  }
+
+  .commander-col.inferred a {
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  .commander-col.inferred a:hover {
+    color: var(--accent);
+  }
+
+  .inferred-badge {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-style: normal;
+    padding: 0.1rem 0.25rem;
+    background: var(--bg-tertiary);
+    border-radius: 3px;
+    color: var(--text-muted);
+    margin-left: 0.25rem;
+    vertical-align: middle;
   }
 
   .colors-col {
