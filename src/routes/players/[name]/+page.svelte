@@ -375,7 +375,7 @@
         <tbody>
           {#each data.tournamentHistory as entry}
             {@const tournament = entry.tournaments as any}
-            {@const decklistUrl = entry.decklist?.startsWith('http') ? entry.decklist : (entry.decklist?.includes('http') ? entry.decklist.substring(entry.decklist.indexOf('http')).split(' ')[0].split('~~')[0] : null)}
+            {@const decklistUrl = entry.decklist?.startsWith('http') ? entry.decklist : (entry.decklist?.includes('http') ? entry.decklist.substring(entry.decklist.indexOf('http')).split(' ')[0].split('~~')[0] : (tournament?.tid && entry.player_id ? `https://topdeck.gg/deck/${tournament.tid}/${entry.player_id}` : null))}
             <tr>
               <td>{tournament?.start_date ? formatDate(tournament.start_date) : '-'}</td>
               <td>

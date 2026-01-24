@@ -103,6 +103,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
     .from('tournament_entries')
     .select(`
       entry_id,
+      player_id,
       standing,
       wins,
       losses,

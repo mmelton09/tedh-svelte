@@ -226,43 +226,36 @@ export const load: PageServerLoad = async ({ params, url }) => {
     }
   }
 
-  // Get commander summary stats from the precalc pilots table
-  // Aggregate all pilots for this commander to get accurate totals
+  // Get commander summary stats directly from commander_stats table
   let summary: any = null;
-  if (precalcPeriod && totalPilots > 0) {
-    // Get all pilots to calculate summary (but don't return all in response)
-    const { data: allPilotsForSummary } = await supabase
-      .from('commander_pilots')
-      .select('entries, total_wins, total_losses, total_draws, conversions, top4s, championships')
+  if (precalcPeriod) {
+    const { data: statsData } = await supabase
+      .from('commander_stats')
+      .select('*')
       .eq('commander_pair', commanderName)
       .eq('period', precalcPeriod)
       .eq('min_size', precalcMinSize)
-      .limit(10000);
+      .eq('data_type', dataType)
+      .single();
 
-    if (allPilotsForSummary && allPilotsForSummary.length > 0) {
-      const totalEntries = allPilotsForSummary.reduce((sum, p) => sum + (p.entries || 0), 0);
-      const totalWins = allPilotsForSummary.reduce((sum, p) => sum + (p.total_wins || 0), 0);
-      const totalLosses = allPilotsForSummary.reduce((sum, p) => sum + (p.total_losses || 0), 0);
-      const totalDraws = allPilotsForSummary.reduce((sum, p) => sum + (p.total_draws || 0), 0);
-      const totalGames = totalWins + totalLosses + totalDraws;
-      const conversions = allPilotsForSummary.reduce((sum, p) => sum + (p.conversions || 0), 0);
-      const top4s = allPilotsForSummary.reduce((sum, p) => sum + (p.top4s || 0), 0);
-      const championships = allPilotsForSummary.reduce((sum, p) => sum + (p.championships || 0), 0);
-
+    if (statsData) {
       summary = {
         commander_pair: commanderName,
-        entries: totalEntries,
-        unique_pilots: totalPilots,
-        total_wins: totalWins,
-        total_losses: totalLosses,
-        total_draws: totalDraws,
-        win_rate: totalGames > 0 ? totalWins / totalGames : 0,
-        conversions,
-        conversion_rate: totalEntries > 0 ? conversions / totalEntries : 0,
-        top4s,
-        top4_rate: totalEntries > 0 ? top4s / totalEntries : 0,
-        championships,
-        champ_rate: totalEntries > 0 ? championships / totalEntries : 0
+        entries: statsData.entries,
+        unique_pilots: statsData.unique_pilots,
+        total_wins: statsData.total_wins,
+        total_losses: statsData.total_losses,
+        total_draws: statsData.total_draws,
+        win_rate: Number(statsData.win_rate) || 0,
+        conversions: statsData.conversions,
+        conversion_rate: Number(statsData.conversion_rate) || 0,
+        top4s: statsData.top4s,
+        top4_rate: Number(statsData.top4_rate) || 0,
+        championships: statsData.championships,
+        champ_rate: Number(statsData.champ_rate) || 0,
+        conv_vs_expected: Number(statsData.conv_vs_expected) || 0,
+        top4_vs_expected: Number(statsData.top4_vs_expected) || 0,
+        champ_vs_expected: Number(statsData.champ_vs_expected) || 0
       };
     }
   }
@@ -274,8 +267,8 @@ export const load: PageServerLoad = async ({ params, url }) => {
   // Wait for parallel operations
   const [cardImages, colorIdentity] = await Promise.all([cardImagesPromise, colorIdentityPromise]);
 
-  // Calculate weekly trends for chart (last 6 months)
-  const monthlyTrends = await calculateWeeklyTrends(commanderName, minSize);
+  // Get weekly trends from precalc table
+  const monthlyTrends = await getWeeklyTrends(commanderName, precalcMinSize, dataType);
 
   return {
     commanderName,
@@ -305,13 +298,23 @@ export const load: PageServerLoad = async ({ params, url }) => {
   };
 };
 
-// Calculate weekly trends for the chart (always last 6 months)
-async function calculateWeeklyTrends(commanderName: string, minSize: number) {
+// Get weekly trends from precalculated table
+async function getWeeklyTrends(commanderName: string, minSize: number, dataType: string) {
+  // Fetch precalculated weekly data
+  const { data: weeklyData } = await supabase
+    .from('commander_trends')
+    .select('*')
+    .eq('commander_pair', commanderName)
+    .eq('min_size', minSize)
+    .eq('data_type', dataType)
+    .order('week_start', { ascending: true })
+    .limit(100);
+
+  // Generate all weeks for last 6 months (to fill gaps)
   const now = new Date();
   const sixMonthsAgo = new Date(now);
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-  // Helper to get Monday of the week
   function getWeekMonday(date: Date): Date {
     const d = new Date(date);
     const day = d.getDay();
@@ -321,11 +324,6 @@ async function calculateWeeklyTrends(commanderName: string, minSize: number) {
     return d;
   }
 
-  function weekKey(date: Date): string {
-    return date.toISOString().split('T')[0];
-  }
-
-  // Generate all weeks for last 6 months
   const allWeeks: Date[] = [];
   let currentWeek = getWeekMonday(sixMonthsAgo);
   const endWeek = getWeekMonday(now);
@@ -335,160 +333,60 @@ async function calculateWeeklyTrends(commanderName: string, minSize: number) {
     currentWeek.setDate(currentWeek.getDate() + 7);
   }
 
-  // Initialize all weeks with zero data
-  const weeklyData: Record<string, any> = {};
-  for (const week of allWeeks) {
-    weeklyData[weekKey(week)] = {
-      weekStart: week,
-      entries: 0,
-      conversions: 0,
-      top4s: 0,
-      championships: 0,
-      wins: 0,
-      losses: 0,
-      draws: 0
-    };
+  // Create a map of existing data
+  const dataMap: Record<string, any> = {};
+  for (const row of weeklyData || []) {
+    dataMap[row.week_start] = row;
   }
 
-  // Get commander names to filter by
-  const commanderNames = commanderName.split(' / ').map(n => n.trim());
-
-  // First, get entry_ids for this commander from deck_commanders table
-  const { data: commanderEntries } = await supabase
-    .from('deck_commanders')
-    .select('entry_id')
-    .in('commander_name', commanderNames)
-    .limit(100000);
-
-  if (!commanderEntries || commanderEntries.length === 0) {
-    // Return empty weekly data as array
-    return Object.values(weeklyData).map((d: any) => ({
-      label: d.weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      fullLabel: d.weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      entries: 0,
-      winRate: 0,
-      winVsExpected: -25,
-      convRate: 0,
-      convVsExpected: -25,
-      top4Rate: 0,
-      top4VsExpected: -25,
-      champRate: 0,
-      champVsExpected: -25
-    }));
-  }
-
-  // Get unique entry_ids
-  const entryIds = [...new Set(commanderEntries.map(e => e.entry_id))];
-
-  // Batch fetch entries in chunks to avoid query limits
-  const BATCH_SIZE = 500;
-  const allChartEntries: any[] = [];
-
-  for (let i = 0; i < entryIds.length; i += BATCH_SIZE) {
-    const batchIds = entryIds.slice(i, i + BATCH_SIZE);
-
-    const { data: batchEntries } = await supabase
-      .from('tournament_entries')
-      .select(`
-        entry_id,
-        standing,
-        wins,
-        losses,
-        draws,
-        tournaments!inner (
-          tid,
-          start_date,
-          total_players,
-          top_cut,
-          is_league
-        ),
-        deck_commanders (
-          commander_name
-        )
-      `)
-      .in('entry_id', batchIds)
-      .gte('tournaments.total_players', minSize)
-      .eq('tournaments.is_league', false)
-      .gte('tournaments.start_date', sixMonthsAgo.toISOString().split('T')[0])
-      .or('wins.gt.0,losses.gt.0,draws.gt.0')
-      .limit(10000);
-
-    if (batchEntries) {
-      allChartEntries.push(...batchEntries);
-    }
-  }
-
-  // Filter to exact commander pair and populate weekly data
-  for (const entry of allChartEntries) {
-    const commanders = (entry.deck_commanders as any[]) || [];
-    const commanderPair = commanders
-      .map((c: any) => c.commander_name)
-      .sort()
-      .join(' / ');
-
-    if (commanderPair !== commanderName) continue;
-
-    const tournament = entry.tournaments as any;
-    if (!tournament?.start_date) continue;
-
-    const date = new Date(tournament.start_date);
-    const monday = getWeekMonday(date);
-    const key = weekKey(monday);
-
-    if (weeklyData[key]) {
-      weeklyData[key].entries++;
-      weeklyData[key].wins += entry.wins || 0;
-      weeklyData[key].losses += entry.losses || 0;
-      weeklyData[key].draws += entry.draws || 0;
-
-      if (tournament.top_cut && entry.standing <= tournament.top_cut) {
-        weeklyData[key].conversions++;
-      }
-      if (entry.standing <= 4 && tournament.top_cut >= 4) {
-        weeklyData[key].top4s++;
-      }
-      if (entry.standing === 1) {
-        weeklyData[key].championships++;
-      }
-    }
-  }
-
-  // Convert to sorted array
-  const sortedWeeks = Object.values(weeklyData).sort((a: any, b: any) =>
-    a.weekStart.getTime() - b.weekStart.getTime()
-  );
-
+  // Build weekly stats with zeros for missing weeks
   let lastMonth = '';
-  const weeklyStats = sortedWeeks.map((d: any) => {
-    const totalGames = d.wins + d.losses + d.draws;
-    const winRate = totalGames > 0 ? d.wins / totalGames : 0;
-    const convRate = d.entries > 0 ? d.conversions / d.entries : 0;
-    const top4Rate = d.entries > 0 ? d.top4s / d.entries : 0;
-    const champRate = d.entries > 0 ? d.championships / d.entries : 0;
-    const monthName = d.weekStart.toLocaleDateString('en-US', { month: 'short' });
+  const weeklyStats = allWeeks.map((weekStart) => {
+    const key = weekStart.toISOString().split('T')[0];
+    const row = dataMap[key];
+    const monthName = weekStart.toLocaleDateString('en-US', { month: 'short' });
 
     let label: string;
     if (monthName !== lastMonth) {
       label = monthName;
       lastMonth = monthName;
     } else {
-      label = d.weekStart.getDate().toString();
+      label = weekStart.getDate().toString();
+    }
+
+    if (row) {
+      const totalGames = row.wins + row.losses + row.draws;
+      return {
+        label,
+        fullLabel: weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        entries: row.entries,
+        conversions: row.conversions,
+        top4s: row.top4s,
+        championships: row.championships,
+        wins: row.wins,
+        losses: row.losses,
+        draws: row.draws,
+        winRate: totalGames > 0 ? row.wins / totalGames : 0,
+        convRate: row.entries > 0 ? row.conversions / row.entries : 0,
+        top4Rate: row.entries > 0 ? row.top4s / row.entries : 0,
+        champRate: row.entries > 0 ? row.championships / row.entries : 0
+      };
     }
 
     return {
       label,
-      fullLabel: d.weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      entries: d.entries,
-      conversions: d.conversions,
-      top4s: d.top4s,
-      championships: d.championships,
-      wins: d.wins,
-      losses: d.losses,
-      draws: d.draws,
-      winRate,
-      convRate,
-      top4Rate,
-      champRate
+      fullLabel: weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      entries: 0,
+      conversions: 0,
+      top4s: 0,
+      championships: 0,
+      wins: 0,
+      losses: 0,
+      draws: 0,
+      winRate: 0,
+      convRate: 0,
+      top4Rate: 0,
+      champRate: 0
     };
   });
 
