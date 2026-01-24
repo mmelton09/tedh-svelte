@@ -111,6 +111,8 @@ export const load: PageServerLoad = async ({ params, url }) => {
   const perPage = 50;
   const sortBy = url.searchParams.get('sort') || 'placement_pct';
   const sortOrder = url.searchParams.get('order') || 'desc';
+  const rankedOnly = url.searchParams.get('ranked') === 'true';
+  const dataType = rankedOnly ? 'ranked' : 'all';
 
   const dateRange = getDateRange(period);
   const names = commanderName.split(' / ').map(n => n.trim());
@@ -175,7 +177,8 @@ export const load: PageServerLoad = async ({ params, url }) => {
       .select('*', { count: 'exact' })
       .eq('commander_pair', commanderName)
       .eq('period', precalcPeriod)
-      .eq('min_size', precalcMinSize);
+      .eq('min_size', precalcMinSize)
+      .eq('data_type', dataType);
 
     // Apply sorting
     const ascending = sortOrder === 'asc';
