@@ -27,6 +27,9 @@
   let top4Filter = $state('none');
   let sortByGains = $state(false);
 
+  // Mobile column group state
+  let mobileColGroup = $state(1);
+
   // Accordion state - track which rows are expanded and their tournament data
   let expandedRows = $state<Set<string>>(new Set());
   let tournamentData = $state<Record<string, any[]>>({});
@@ -763,9 +766,18 @@
   <button class="clear-btn" onclick={clearFilters}>Clear</button>
 </div>
 
+<!-- Mobile Column Group Toggle -->
+<div class="col-group-toggle">
+  <button class="col-group-btn" class:active={mobileColGroup === 1} onclick={() => mobileColGroup = 1}>Meta</button>
+  <button class="col-group-btn" class:active={mobileColGroup === 2} onclick={() => mobileColGroup = 2}>Win</button>
+  <button class="col-group-btn" class:active={mobileColGroup === 3} onclick={() => mobileColGroup = 3}>Conv</button>
+  <button class="col-group-btn" class:active={mobileColGroup === 4} onclick={() => mobileColGroup = 4}>Top4</button>
+  <button class="col-group-btn" class:active={mobileColGroup === 5} onclick={() => mobileColGroup = 5}>🏆</button>
+</div>
+
 <!-- Commander Table -->
 <div class="table-container">
-  <table>
+  <table class="show-g{mobileColGroup}">
     <thead>
       <tr>
         <th style="width: 40px">#</th>
@@ -777,7 +789,7 @@
           Commander
         </th>
         <th
-          class="metric colors-col"
+          class="metric colors-col col-g1"
           class:sorted-asc={sortCol === 'color_identity' && sortAsc}
           class:sorted-desc={sortCol === 'color_identity' && !sortAsc}
           onclick={() => handleSort('color_identity')}
@@ -785,7 +797,7 @@
           Colors
         </th>
         <th
-          class="metric"
+          class="metric col-g1"
           class:sorted-asc={sortCol === 'entries' && sortAsc}
           class:sorted-desc={sortCol === 'entries' && !sortAsc}
           onclick={() => handleSort('entries')}
@@ -793,7 +805,7 @@
           Entries
         </th>
         <th
-          class="metric"
+          class="metric col-g1"
           class:sorted-asc={sortCol === 'meta_pct' && sortAsc}
           class:sorted-desc={sortCol === 'meta_pct' && !sortAsc}
           onclick={() => handleSort('meta_pct')}
@@ -801,7 +813,7 @@
           Meta%
         </th>
         <th
-          class="metric"
+          class="metric col-g2"
           class:sorted-asc={sortCol === 'win_rate' && sortAsc}
           class:sorted-desc={sortCol === 'win_rate' && !sortAsc}
           onclick={() => handleSort('win_rate')}
@@ -809,7 +821,7 @@
           Win%
         </th>
         <th
-          class="metric"
+          class="metric col-g2"
           class:sorted-asc={sortCol === 'swiss5' && sortAsc}
           class:sorted-desc={sortCol === 'swiss5' && !sortAsc}
           onclick={() => handleSort('swiss5')}
@@ -817,7 +829,7 @@
           5wiss
         </th>
         <th
-          class="metric"
+          class="metric col-g3"
           class:sorted-asc={sortCol === 'conversions' && sortAsc}
           class:sorted-desc={sortCol === 'conversions' && !sortAsc}
           onclick={() => handleSort('conversions')}
@@ -825,7 +837,7 @@
           Conv
         </th>
         <th
-          class="metric"
+          class="metric col-g3"
           class:sorted-asc={(showVsExpected ? sortCol === 'conv_vs_expected' : sortCol === 'conversion_rate') && sortAsc}
           class:sorted-desc={(showVsExpected ? sortCol === 'conv_vs_expected' : sortCol === 'conversion_rate') && !sortAsc}
           onclick={() => handleSort(showVsExpected ? 'conv_vs_expected' : 'conversion_rate')}
@@ -833,7 +845,7 @@
           {showVsExpected ? 'Conv±' : 'Conv%'}
         </th>
         <th
-          class="metric"
+          class="metric col-g4"
           class:sorted-asc={sortCol === 'top4s' && sortAsc}
           class:sorted-desc={sortCol === 'top4s' && !sortAsc}
           onclick={() => handleSort('top4s')}
@@ -841,7 +853,7 @@
           Top4
         </th>
         <th
-          class="metric"
+          class="metric col-g4"
           class:sorted-asc={(showVsExpected ? sortCol === 'top4_vs_expected' : sortCol === 'top4_rate') && sortAsc}
           class:sorted-desc={(showVsExpected ? sortCol === 'top4_vs_expected' : sortCol === 'top4_rate') && !sortAsc}
           onclick={() => handleSort(showVsExpected ? 'top4_vs_expected' : 'top4_rate')}
@@ -849,7 +861,7 @@
           {showVsExpected ? 'Top4±' : 'Top4%'}
         </th>
         <th
-          class="metric"
+          class="metric col-g5"
           class:sorted-asc={sortCol === 'championships' && sortAsc}
           class:sorted-desc={sortCol === 'championships' && !sortAsc}
           onclick={() => handleSort('championships')}
@@ -857,7 +869,7 @@
           🏆
         </th>
         <th
-          class="metric"
+          class="metric col-g5"
           class:sorted-asc={(showVsExpected ? sortCol === 'champ_vs_expected' : sortCol === 'champ_rate') && sortAsc}
           class:sorted-desc={(showVsExpected ? sortCol === 'champ_vs_expected' : sortCol === 'champ_rate') && !sortAsc}
           onclick={() => handleSort(showVsExpected ? 'champ_vs_expected' : 'champ_rate')}
@@ -882,7 +894,7 @@
               {cmd.commander_pair}
             </a>
           </td>
-          <td class="metric colors-col">
+          <td class="metric colors-col col-g1">
             {#if cmd.color_identity}
               {#each [...cmd.color_identity] as color}
                 <i class="ms ms-{color.toLowerCase()} ms-cost"></i>
@@ -891,7 +903,7 @@
               <i class="ms ms-c ms-cost"></i>
             {/if}
           </td>
-          <td class="metric {showMedals ? getMedalClass('entries', cmd.commander_pair) : ''}">
+          <td class="metric col-g1 {showMedals ? getMedalClass('entries', cmd.commander_pair) : ''}">
             {cmd.entries}
             {#if showDelta && cmd.delta_entries != null}
               <span class="delta" class:positive={cmd.delta_entries > 0} class:negative={cmd.delta_entries < 0}>
@@ -902,8 +914,8 @@
               <span class="new-badge">NEW</span>
             {/if}
           </td>
-          <td class="metric {showMedals ? getMedalClass('meta_pct', cmd.commander_pair) : ''}">{((cmd.entries / filteredTotalEntries) * 100).toFixed(1)}%</td>
-          <td class="metric {showMedals ? getMedalClass('win_rate', cmd.commander_pair) : ''}">
+          <td class="metric col-g1 {showMedals ? getMedalClass('meta_pct', cmd.commander_pair) : ''}">{((cmd.entries / filteredTotalEntries) * 100).toFixed(1)}%</td>
+          <td class="metric col-g2 {showMedals ? getMedalClass('win_rate', cmd.commander_pair) : ''}">
             {formatPct(cmd.win_rate, 1)}
             {#if showDelta && cmd.delta_win_rate != null}
               <span class="delta" class:positive={cmd.delta_win_rate > 0} class:negative={cmd.delta_win_rate < 0}>
@@ -911,9 +923,9 @@
               </span>
             {/if}
           </td>
-          <td class="metric {showMedals ? getMedalClass('swiss5', cmd.commander_pair) : ''}">{formatSwiss5(cmd.win_rate || 0, drawRate)}</td>
-          <td class="metric {showMedals ? getMedalClass('conversions', cmd.commander_pair) : ''}">{cmd.conversions}</td>
-          <td class="metric {showMedals ? getMedalClass('conversion_rate', cmd.commander_pair) : ''}">
+          <td class="metric col-g2 {showMedals ? getMedalClass('swiss5', cmd.commander_pair) : ''}">{formatSwiss5(cmd.win_rate || 0, drawRate)}</td>
+          <td class="metric col-g3 {showMedals ? getMedalClass('conversions', cmd.commander_pair) : ''}">{cmd.conversions}</td>
+          <td class="metric col-g3 {showMedals ? getMedalClass('conversion_rate', cmd.commander_pair) : ''}">
             {#if showVsExpected}
               <span class="vs-exp {getVsExpClass(cmd.conv_vs_expected)}">{formatVsExp(cmd.conv_vs_expected)}</span>
             {:else}
@@ -925,8 +937,8 @@
               </span>
             {/if}
           </td>
-          <td class="metric {showMedals ? getMedalClass('top4s', cmd.commander_pair) : ''}">{cmd.top4s}</td>
-          <td class="metric {showMedals ? getMedalClass('top4_rate', cmd.commander_pair) : ''}">
+          <td class="metric col-g4 {showMedals ? getMedalClass('top4s', cmd.commander_pair) : ''}">{cmd.top4s}</td>
+          <td class="metric col-g4 {showMedals ? getMedalClass('top4_rate', cmd.commander_pair) : ''}">
             {#if showVsExpected}
               <span class="vs-exp {getVsExpClass(cmd.top4_vs_expected)}">{formatVsExp(cmd.top4_vs_expected)}</span>
             {:else}
@@ -938,8 +950,8 @@
               </span>
             {/if}
           </td>
-          <td class="metric {showMedals ? getMedalClass('championships', cmd.commander_pair) : ''}">{cmd.championships}</td>
-          <td class="metric {showMedals ? getMedalClass('champ_rate', cmd.commander_pair) : ''}">
+          <td class="metric col-g5 {showMedals ? getMedalClass('championships', cmd.commander_pair) : ''}">{cmd.championships}</td>
+          <td class="metric col-g5 {showMedals ? getMedalClass('champ_rate', cmd.commander_pair) : ''}">
             {#if showVsExpected}
               <span class="vs-exp {getVsExpClass(cmd.champ_vs_expected)}">{formatVsExp(cmd.champ_vs_expected)}</span>
             {:else}
@@ -1795,23 +1807,140 @@
     font-weight: bold;
   }
 
+  /* Column group toggle - hidden on desktop */
+  .col-group-toggle {
+    display: none;
+    justify-content: center;
+    gap: 4px;
+    margin: 10px 0;
+  }
+
+  .col-group-btn {
+    padding: 6px 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-muted);
+    font-size: 0.8em;
+    cursor: pointer;
+  }
+
+  .col-group-btn.active {
+    background: #333;
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  /* Column groups - show all by default on desktop */
+  .col-g1, .col-g2, .col-g3, .col-g4, .col-g5 {
+    display: table-cell;
+  }
+
   @media (max-width: 768px) {
+    /* Show column group toggle on mobile */
+    .col-group-toggle {
+      display: flex;
+    }
+
+    /* Hide all column groups by default on mobile */
+    .col-g1, .col-g2, .col-g3, .col-g4, .col-g5 {
+      display: none;
+    }
+
+    /* Show only active column group */
+    table.show-g1 .col-g1 { display: table-cell; }
+    table.show-g2 .col-g2 { display: table-cell; }
+    table.show-g3 .col-g3 { display: table-cell; }
+    table.show-g4 .col-g4 { display: table-cell; }
+    table.show-g5 .col-g5 { display: table-cell; }
+
     .period-toggle {
       gap: 4px;
     }
 
     .period-btn {
-      padding: 4px 10px;
-      font-size: 0.8em;
+      padding: 4px 8px;
+      font-size: 0.75em;
+    }
+
+    .period-separator {
+      display: none;
     }
 
     .filters {
-      gap: 8px;
+      gap: 6px;
       padding: 8px;
+      flex-wrap: wrap;
+    }
+
+    .filter-group {
+      font-size: 0.85em;
+    }
+
+    .filter-group select {
+      padding: 4px 6px;
+      font-size: 0.85em;
+    }
+
+    .stats-summary {
+      display: none;
     }
 
     .featured-tournaments {
       display: none;
+    }
+
+    table {
+      font-size: 0.85em;
+    }
+
+    th, td {
+      padding: 6px 4px;
+    }
+
+    .colors-col .ms {
+      font-size: 12px !important;
+    }
+  }
+
+  @media (max-width: 480px) {
+    body {
+      padding: 5px;
+    }
+
+    h1 {
+      font-size: 1.2em;
+    }
+
+    table {
+      font-size: 0.75em;
+    }
+
+    th, td {
+      padding: 4px 2px;
+    }
+
+    .period-toggle {
+      gap: 2px;
+    }
+
+    .period-btn {
+      padding: 3px 6px;
+      font-size: 0.7em;
+    }
+
+    .filter-group select {
+      padding: 3px 4px;
+      font-size: 0.8em;
+    }
+
+    .colors-col .ms {
+      font-size: 10px !important;
+    }
+
+    .col-group-btn {
+      padding: 4px 8px;
+      font-size: 0.75em;
     }
   }
 </style>
