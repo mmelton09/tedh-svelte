@@ -624,11 +624,11 @@
 {#if data.liveTournaments && data.liveTournaments.length > 0 && !data.selectedTournament}
 <div class="live-tournaments">
   {#each data.liveTournaments as t}
-    <div class="live-tournament">
+    <a href="/tournaments/{t.tid}" class="live-tournament">
       <span class="live-badge">LIVE</span>
-      <span class="size" onclick={() => selectTournament(t.tid)} title="Filter meta by this tournament">{t.total_players}</span>
-      <a href="/tournaments/{t.tid}" class="name">{t.tournament_name}</a>
-    </div>
+      <span class="name">{t.tournament_name}</span>
+      <span class="size">{t.total_players} players</span>
+    </a>
   {/each}
 </div>
 {/if}
@@ -1256,31 +1256,26 @@
     letter-spacing: 0.5px;
   }
 
-  .live-tournament .size {
-    background: var(--accent);
-    color: var(--bg-primary);
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-weight: bold;
-    font-size: 0.9em;
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-
-  .live-tournament .size:hover {
-    transform: scale(1.05);
-    background: var(--accent-hover);
-  }
-
   .live-tournament .name {
     font-weight: 500;
     color: var(--text-primary);
+  }
+
+  .live-tournament .size {
+    color: var(--text-muted);
+    font-size: 0.85em;
+  }
+
+  a.live-tournament {
     text-decoration: none;
   }
 
-  .live-tournament .name:hover {
+  a.live-tournament:hover {
+    background: rgba(239, 68, 68, 0.25);
+  }
+
+  a.live-tournament:hover .name {
     color: var(--accent);
-    text-decoration: underline;
   }
 
   /* Featured Tournaments */
