@@ -617,6 +617,23 @@
 </div>
 {/if}
 
+<!-- Live Tournaments -->
+{@const liveTournaments = [
+  { name: 'Royal Rumble 12K', url: 'https://topdeck.gg/bracket/the-royal-rumble-the-second-showdown-cedh-12k', players: 290 },
+  { name: 'Breach the Bay 10K', url: 'https://topdeck.gg/bracket/breach-the-bay-cedh-10k', players: 183 }
+]}
+{#if liveTournaments.length > 0 && !data.selectedTournament}
+<div class="live-tournaments">
+  {#each liveTournaments as t}
+    <a href={t.url} target="_blank" rel="noopener" class="live-tournament">
+      <span class="live-badge">LIVE</span>
+      <span class="size">{t.players}</span>
+      <span class="name">{t.name}</span>
+    </a>
+  {/each}
+</div>
+{/if}
+
 <!-- Featured Tournaments -->
 {#if data.recentTournaments && data.recentTournaments.length > 0 && !data.selectedTournament}
 <div class="featured-tournaments">
@@ -641,7 +658,7 @@
       </div>
     {/if}
   </div>
-  {#each data.recentTournaments.slice(0, 3) as t}
+  {#each data.recentTournaments.slice(0, 1) as t}
     <div class="featured-tournament" onclick={() => selectTournament(t.tid)}>
       <span class="size">{t.total_players}</span>
       <a href="/tournaments/{t.tid}" class="name" onclick={(e) => e.stopPropagation()}>{t.tournament_name}</a>
@@ -1202,6 +1219,62 @@
 
   .stats-summary .muted {
     color: var(--text-muted);
+  }
+
+  /* Live Tournaments */
+  .live-tournaments {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin: 15px 0;
+    flex-wrap: wrap;
+  }
+
+  .live-tournament {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid #ef4444;
+    border-radius: 6px;
+    color: var(--text-primary);
+    text-decoration: none;
+    font-size: 0.9em;
+    transition: all 0.2s;
+    animation: pulse-border 2s infinite;
+  }
+
+  .live-tournament:hover {
+    background: rgba(239, 68, 68, 0.25);
+    transform: scale(1.02);
+  }
+
+  @keyframes pulse-border {
+    0%, 100% { border-color: #ef4444; box-shadow: 0 0 5px rgba(239, 68, 68, 0.3); }
+    50% { border-color: #f87171; box-shadow: 0 0 10px rgba(239, 68, 68, 0.5); }
+  }
+
+  .live-badge {
+    background: #ef4444;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.7em;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+  }
+
+  .live-tournament .size {
+    background: var(--bg-tertiary);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.85em;
+    color: var(--text-muted);
+  }
+
+  .live-tournament .name {
+    font-weight: 500;
   }
 
   /* Featured Tournaments */
