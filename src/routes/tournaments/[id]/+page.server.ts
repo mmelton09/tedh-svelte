@@ -332,51 +332,6 @@ export const load: PageServerLoad = async ({ params, url }) => {
     champDelta: (thisChampRate - baselineChampRate) * 100
   };
 
-  // Fetch inferred decks from Moxfield (for live tournaments without confirmed commanders)
-  const { data: inferredDecks } = await supabase
-    .from('inferred_decks')
-    .select('player_id, moxfield_username, deck_name, deck_url, commanders, last_updated')
-    .eq('tid', tournamentId)
-    .limit(10000);
-
-  // Build a map of player_id -> inferred deck
-  const inferredDeckMap: Record<string, {
-    moxfield_username: string;
-    deck_name: string;
-    deck_url: string;
-    commanders: string[];
-    last_updated: string;
-  }> = {};
-  for (const deck of inferredDecks || []) {
-    inferredDeckMap[deck.player_id] = {
-      moxfield_username: deck.moxfield_username,
-      deck_name: deck.deck_name,
-      deck_url: deck.deck_url,
-      commanders: deck.commanders || [],
-      last_updated: deck.last_updated
-    };
-  }
-
-  // Also fetch color identities for inferred commanders
-  const inferredCommanderNames = new Set<string>();
-  for (const deck of inferredDecks || []) {
-    for (const cmd of deck.commanders || []) {
-      if (cmd && !colorMap[cmd]) {
-        inferredCommanderNames.add(cmd);
-      }
-    }
-  }
-  if (inferredCommanderNames.size > 0) {
-    const { data: inferredColors } = await supabase
-      .from('commanders')
-      .select('commander_name, color_identity')
-      .in('commander_name', Array.from(inferredCommanderNames))
-      .limit(1000);
-    for (const c of inferredColors || []) {
-      colorMap[c.commander_name] = c.color_identity || '';
-    }
-  }
-
   return {
     tournament,
     standings: standings || [],
@@ -389,7 +344,6 @@ export const load: PageServerLoad = async ({ params, url }) => {
     seatWinRates,
     playerMatches,
     colorMap,
-    liveRecords,
-    inferredDeckMap
+    liveRecords
   };
 };
