@@ -30,6 +30,12 @@
   // Mobile column group state
   let mobileColGroup = $state(1);
 
+  // Live tournaments - edit this list for active events
+  const liveTournaments = [
+    { name: 'Royal Rumble 12K', url: 'https://topdeck.gg/bracket/the-royal-rumble-the-second-showdown-cedh-12k', players: 290 },
+    { name: 'Breach the Bay 10K', url: 'https://topdeck.gg/bracket/breach-the-bay-cedh-10k', players: 183 }
+  ];
+
   // Accordion state - track which rows are expanded and their tournament data
   let expandedRows = $state<Set<string>>(new Set());
   let tournamentData = $state<Record<string, any[]>>({});
@@ -618,10 +624,6 @@
 {/if}
 
 <!-- Live Tournaments -->
-{@const liveTournaments = [
-  { name: 'Royal Rumble 12K', url: 'https://topdeck.gg/bracket/the-royal-rumble-the-second-showdown-cedh-12k', players: 290 },
-  { name: 'Breach the Bay 10K', url: 'https://topdeck.gg/bracket/breach-the-bay-cedh-10k', players: 183 }
-]}
 {#if liveTournaments.length > 0 && !data.selectedTournament}
 <div class="live-tournaments">
   {#each liveTournaments as t}
