@@ -683,6 +683,17 @@
   }
 
   /* Table */
+  thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  thead th {
+    background: var(--bg-secondary);
+    border-bottom: 2px solid var(--border);
+  }
+
   .sortable {
     cursor: pointer;
     user-select: none;
