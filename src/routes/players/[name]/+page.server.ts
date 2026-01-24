@@ -54,6 +54,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
   const identifier = decodeURIComponent(params.name);
   const minSize = parseInt(url.searchParams.get('min_size') || '16') || 16;
   const period = url.searchParams.get('period') || 'all';
+  const rankedOnly = url.searchParams.get('ranked') === 'true';
   const dateRange = getDateRange(period);
 
   // Get player stats - try player_id first (from leaderboard links), then player_name
@@ -112,7 +113,8 @@ export const load: PageServerLoad = async ({ params, url }) => {
         tournament_name,
         start_date,
         total_players,
-        top_cut
+        top_cut,
+        has_pod_data
       ),
       deck_commanders (
         commander_name
@@ -122,6 +124,11 @@ export const load: PageServerLoad = async ({ params, url }) => {
     .gte('tournaments.total_players', minSize)
     .eq('tournaments.is_league', false)
     .or('wins.gt.0,losses.gt.0,draws.gt.0');
+
+  // Filter to only tournaments with complete pod data if ranked mode
+  if (rankedOnly) {
+    historyQuery = historyQuery.eq('tournaments.has_pod_data', true);
+  }
 
   // Apply date filters
   if (dateRange.start) {
