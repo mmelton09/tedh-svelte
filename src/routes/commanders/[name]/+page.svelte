@@ -202,21 +202,52 @@
   // Accordion state - track which pilot rows are expanded
   let expandedPilots = $state<Set<string>>(new Set());
 
+  // Cache for fetched tournament data
+  let pilotTournaments = $state<Record<string, any[]>>({});
+  let loadingPilots = $state<Set<string>>(new Set());
+
   // Toggle state for ±Exp display
   let showVsExpected = $state(false);
 
-  function togglePilot(playerId: string) {
+  async function togglePilot(playerId: string) {
     const newSet = new Set(expandedPilots);
     if (newSet.has(playerId)) {
       newSet.delete(playerId);
     } else {
       newSet.add(playerId);
+      // Fetch tournaments if not already cached
+      if (!pilotTournaments[playerId] && !loadingPilots.has(playerId)) {
+        loadingPilots = new Set([...loadingPilots, playerId]);
+        try {
+          const rankedParam = $page.url.searchParams.get('ranked') === 'true' ? 'ranked' : 'all';
+          const response = await fetch(
+            `/api/pilot-tournaments?player_id=${encodeURIComponent(playerId)}&commander=${encodeURIComponent(data.commanderName)}&min_size=${data.minSize}&period=${data.period}&data_type=${rankedParam}`
+          );
+          if (response.ok) {
+            const result = await response.json();
+            pilotTournaments = { ...pilotTournaments, [playerId]: result.tournaments || [] };
+          }
+        } catch (e) {
+          console.error('Failed to fetch pilot tournaments:', e);
+        }
+        const newLoading = new Set(loadingPilots);
+        newLoading.delete(playerId);
+        loadingPilots = newLoading;
+      }
     }
     expandedPilots = newSet;
   }
 
   function isPilotExpanded(playerId: string): boolean {
     return expandedPilots.has(playerId);
+  }
+
+  function getPilotTournaments(playerId: string): any[] {
+    return pilotTournaments[playerId] || [];
+  }
+
+  function isPilotLoading(playerId: string): boolean {
+    return loadingPilots.has(playerId);
   }
 
   function formatPct(val: number | null, decimals = 1): string {
@@ -770,10 +801,14 @@
           </tr>
           <!-- Expanded detail row with tournaments -->
           {#if expanded}
+            {@const tournaments = getPilotTournaments(pilot.player_id)}
+            {@const loading = isPilotLoading(pilot.player_id)}
             <tr class="detail-row">
               <td colspan="12">
                 <div class="tournament-details">
-                  {#if pilot.tournaments && pilot.tournaments.length > 0}
+                  {#if loading}
+                    <div class="loading-tournaments">Loading tournaments...</div>
+                  {:else if tournaments.length > 0}
                     <table class="tournaments-table">
                       <thead>
                         <tr>
@@ -785,7 +820,7 @@
                         </tr>
                       </thead>
                       <tbody>
-                        {#each pilot.tournaments as t}
+                        {#each tournaments as t}
                           <tr class:gold={t.standing === 1} class:silver={t.standing === 2} class:bronze={t.standing === 3} class:top-cut={t.standing <= 4}>
                             <td>{t.start_date ? formatDate(t.start_date) : '-'}</td>
                             <td><a href="/tournaments/{t.tid}">{t.tournament_name}</a></td>
@@ -803,7 +838,7 @@
                       </tbody>
                     </table>
                   {:else}
-                    <div class="no-tournaments">No tournament data available.</div>
+                    <div class="no-tournaments">No tournament data available for this period.</div>
                   {/if}
                 </div>
               </td>
@@ -1397,5 +1432,12 @@
     padding: 1rem;
     text-align: center;
     color: var(--text-muted);
+  }
+
+  .loading-tournaments {
+    padding: 1rem;
+    text-align: center;
+    color: var(--text-muted);
+    font-style: italic;
   }
 </style>
