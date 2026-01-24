@@ -168,7 +168,31 @@ a:hover {
 
 /* Tables */
 .table-container {
-  overflow-x: auto;
+  width: 100%;
+}
+
+/* Sticky table headers - works when page scrolls, not container */
+table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+table thead th {
+  background: var(--bg-secondary);
+  border-bottom: 2px solid var(--border);
+}
+
+/* Allow horizontal scroll only on small screens */
+@media (max-width: 768px) {
+  .table-container {
+    overflow-x: auto;
+  }
+
+  /* On mobile, sticky won't work with overflow, so disable it */
+  table thead {
+    position: static;
+  }
 }
 
 table {
