@@ -30,11 +30,46 @@
   // Mobile column group state
   let mobileColGroup = $state(1);
 
-  // Live tournaments - edit this list for active events
-  const liveTournaments = [
-    { name: 'Royal Rumble 12K', url: 'https://topdeck.gg/bracket/the-royal-rumble-the-second-showdown-cedh-12k', players: 290 },
-    { name: 'Breach the Bay 10K', url: 'https://topdeck.gg/bracket/breach-the-bay-cedh-10k', players: 183 }
-  ];
+  // Live tournaments state
+  let liveTournaments = $state<any[]>([]);
+  let liveLoading = $state(false);
+  let liveLastFetched = $state<string | null>(null);
+  let liveError = $state<string | null>(null);
+  let expandedLive = $state<Set<string>>(new Set());
+  let liveView = $state<Record<string, 'standings' | 'commanders'>>({});
+
+  // Fetch live tournament data (manual trigger only - respect API limits)
+  async function fetchLiveTournaments() {
+    liveLoading = true;
+    try {
+      const res = await fetch('/api/live-tournaments');
+      const data = await res.json();
+      liveTournaments = data.tournaments || [];
+      liveLastFetched = new Date().toLocaleTimeString();
+      liveError = null;
+    } catch (e) {
+      console.error('Failed to fetch live tournaments:', e);
+      liveError = 'Failed to load live data';
+    }
+    liveLoading = false;
+  }
+
+  function toggleLiveExpand(tid: string) {
+    const newSet = new Set(expandedLive);
+    if (newSet.has(tid)) {
+      newSet.delete(tid);
+    } else {
+      newSet.add(tid);
+      if (!liveView[tid]) {
+        liveView = { ...liveView, [tid]: 'standings' };
+      }
+    }
+    expandedLive = newSet;
+  }
+
+  function setLiveView(tid: string, view: 'standings' | 'commanders') {
+    liveView = { ...liveView, [tid]: view };
+  }
 
   // Accordion state - track which rows are expanded and their tournament data
   let expandedRows = $state<Set<string>>(new Set());
@@ -624,15 +659,117 @@
 {/if}
 
 <!-- Live Tournaments -->
-{#if liveTournaments.length > 0 && !data.selectedTournament}
-<div class="live-tournaments">
-  {#each liveTournaments as t}
-    <a href={t.url} target="_blank" rel="noopener" class="live-tournament">
-      <span class="live-badge">LIVE</span>
-      <span class="size">{t.players}</span>
-      <span class="name">{t.name}</span>
-    </a>
-  {/each}
+{#if !data.selectedTournament}
+<div class="live-section">
+  <div class="live-header">
+    <span class="live-badge">LIVE</span>
+    <span class="live-title">Live Tournaments</span>
+    <button class="refresh-btn" onclick={fetchLiveTournaments} disabled={liveLoading}>
+      {liveLoading ? 'Loading...' : 'Refresh'}
+    </button>
+    {#if liveLastFetched}
+      <span class="live-timestamp">Updated {liveLastFetched}</span>
+    {/if}
+  </div>
+
+  {#if !liveLastFetched && !liveLoading}
+    <div class="live-prompt">
+      <button class="load-live-btn" onclick={fetchLiveTournaments}>Load Live Tournament Data</button>
+      <span class="live-note">Data cached server-side for 5 minutes</span>
+    </div>
+  {:else if liveError}
+    <div class="live-error">{liveError}</div>
+  {:else if liveTournaments.length > 0}
+    <div class="live-tournaments">
+      {#each liveTournaments as t}
+        <div class="live-tournament-card" class:expanded={expandedLive.has(t.tid)}>
+          <div class="live-card-header" onclick={() => toggleLiveExpand(t.tid)}>
+            <span class="expand-arrow">{expandedLive.has(t.tid) ? '▼' : '▶'}</span>
+            <span class="tournament-name">{t.name}</span>
+            <span class="tournament-stats">
+              <span class="player-count">{t.totalPlayers} players</span>
+              {#if t.currentRound}
+                <span class="round-info">Round {t.currentRound}</span>
+              {/if}
+            </span>
+          </div>
+
+          {#if expandedLive.has(t.tid)}
+            <div class="live-card-body">
+              <div class="view-toggle">
+                <button
+                  class:active={liveView[t.tid] === 'standings'}
+                  onclick={() => setLiveView(t.tid, 'standings')}
+                >Top 32</button>
+                <button
+                  class:active={liveView[t.tid] === 'commanders'}
+                  onclick={() => setLiveView(t.tid, 'commanders')}
+                >Commanders</button>
+              </div>
+
+              {#if liveView[t.tid] === 'standings'}
+                <table class="live-standings-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Player</th>
+                      <th>Commander</th>
+                      <th>Record</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {#each t.topStandings as s}
+                      <tr class:top4={s.standing <= 4}>
+                        <td class="standing" class:gold={s.standing === 1} class:silver={s.standing === 2} class:bronze={s.standing === 3}>{s.standing}</td>
+                        <td class="player-name">{s.name}</td>
+                        <td class="commander">
+                          {#if s.commander}
+                            <a href="/commanders/{encodeURIComponent(s.commander)}">{s.commander}</a>
+                          {:else}
+                            <span class="unknown">Unknown</span>
+                          {/if}
+                        </td>
+                        <td class="record">{s.wins}-{s.losses}-{s.draws}</td>
+                      </tr>
+                    {/each}
+                  </tbody>
+                </table>
+              {:else}
+                <table class="live-commanders-table">
+                  <thead>
+                    <tr>
+                      <th>Commander</th>
+                      <th>Count</th>
+                      <th>Meta%</th>
+                      <th>Win%</th>
+                      <th>Best</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {#each t.commanderBreakdown.slice(0, 20) as c}
+                      <tr>
+                        <td class="commander">
+                          {#if c.commander !== 'Unknown'}
+                            <a href="/commanders/{encodeURIComponent(c.commander)}">{c.commander}</a>
+                          {:else}
+                            <span class="unknown">Unknown</span>
+                          {/if}
+                        </td>
+                        <td class="metric">{c.count}</td>
+                        <td class="metric">{c.metaPct.toFixed(1)}%</td>
+                        <td class="metric">{(c.winRate * 100).toFixed(1)}%</td>
+                        <td class="metric" class:gold={c.topStanding === 1} class:silver={c.topStanding === 2} class:bronze={c.topStanding === 3}>#{c.topStanding}</td>
+                      </tr>
+                    {/each}
+                  </tbody>
+                </table>
+              {/if}
+            </div>
+          {/if}
+        </div>
+      {/each}
+    </div>
+  {/if}
 </div>
 {/if}
 
@@ -1223,61 +1360,257 @@
     color: var(--text-muted);
   }
 
-  /* Live Tournaments */
-  .live-tournaments {
-    display: flex;
-    justify-content: center;
-    gap: 12px;
+  /* Live Tournaments Section */
+  .live-section {
     margin: 15px 0;
-    flex-wrap: wrap;
-  }
-
-  .live-tournament {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 14px;
-    background: rgba(239, 68, 68, 0.15);
+    padding: 15px;
+    background: var(--bg-secondary);
     border: 1px solid #ef4444;
-    border-radius: 6px;
-    color: var(--text-primary);
-    text-decoration: none;
-    font-size: 0.9em;
-    transition: all 0.2s;
-    animation: pulse-border 2s infinite;
-  }
-
-  .live-tournament:hover {
-    background: rgba(239, 68, 68, 0.25);
-    transform: scale(1.02);
+    border-radius: 8px;
+    animation: pulse-border 3s infinite;
   }
 
   @keyframes pulse-border {
-    0%, 100% { border-color: #ef4444; box-shadow: 0 0 5px rgba(239, 68, 68, 0.3); }
-    50% { border-color: #f87171; box-shadow: 0 0 10px rgba(239, 68, 68, 0.5); }
+    0%, 100% { border-color: #ef4444; box-shadow: 0 0 5px rgba(239, 68, 68, 0.2); }
+    50% { border-color: #f87171; box-shadow: 0 0 10px rgba(239, 68, 68, 0.4); }
+  }
+
+  .live-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
   }
 
   .live-badge {
     background: #ef4444;
     color: white;
-    padding: 2px 6px;
-    border-radius: 3px;
-    font-size: 0.7em;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.75em;
     font-weight: bold;
     letter-spacing: 0.5px;
+    animation: pulse-bg 1.5s infinite;
   }
 
-  .live-tournament .size {
+  @keyframes pulse-bg {
+    0%, 100% { background: #ef4444; }
+    50% { background: #dc2626; }
+  }
+
+  .live-title {
+    font-weight: 600;
+    font-size: 1.1em;
+  }
+
+  .refresh-btn {
+    margin-left: auto;
+    padding: 4px 12px;
     background: var(--bg-tertiary);
-    padding: 2px 6px;
-    border-radius: 3px;
-    font-size: 0.85em;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 0.8em;
+    cursor: pointer;
+  }
+
+  .refresh-btn:hover:not(:disabled) {
+    border-color: var(--accent);
+  }
+
+  .refresh-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .live-timestamp {
+    font-size: 0.75em;
     color: var(--text-muted);
   }
 
-  .live-tournament .name {
+  .live-prompt {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 20px;
+  }
+
+  .load-live-btn {
+    padding: 10px 24px;
+    background: #ef4444;
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .load-live-btn:hover {
+    background: #dc2626;
+    transform: scale(1.02);
+  }
+
+  .live-note {
+    font-size: 0.75em;
+    color: var(--text-muted);
+  }
+
+  .live-error {
+    text-align: center;
+    color: var(--negative);
+    padding: 10px;
+  }
+
+  .live-tournaments {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .live-tournament-card {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .live-tournament-card.expanded {
+    border-color: #ef4444;
+  }
+
+  .live-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 15px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .live-card-header:hover {
+    background: var(--bg-card);
+  }
+
+  .live-card-header .expand-arrow {
+    color: var(--text-muted);
+    font-size: 0.8em;
+  }
+
+  .live-tournament-card.expanded .expand-arrow {
+    color: #ef4444;
+  }
+
+  .tournament-name {
+    font-weight: 600;
+    flex: 1;
+  }
+
+  .tournament-stats {
+    display: flex;
+    gap: 12px;
+    font-size: 0.85em;
+  }
+
+  .player-count {
+    color: var(--accent);
     font-weight: 500;
   }
+
+  .round-info {
+    color: var(--text-muted);
+  }
+
+  .live-card-body {
+    border-top: 1px solid var(--border);
+    padding: 12px 15px;
+  }
+
+  .view-toggle {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+
+  .view-toggle button {
+    padding: 5px 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-muted);
+    font-size: 0.8em;
+    cursor: pointer;
+  }
+
+  .view-toggle button.active {
+    background: #ef4444;
+    border-color: #ef4444;
+    color: white;
+  }
+
+  .live-standings-table, .live-commanders-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85em;
+  }
+
+  .live-standings-table th, .live-commanders-table th {
+    background: var(--bg-secondary);
+    padding: 8px 10px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .live-standings-table td, .live-commanders-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .live-standings-table tr.top4 {
+    background: rgba(76, 175, 80, 0.1);
+  }
+
+  .live-standings-table .standing {
+    font-weight: 600;
+    width: 40px;
+  }
+
+  .live-standings-table .standing.gold { color: var(--gold); }
+  .live-standings-table .standing.silver { color: var(--silver); }
+  .live-standings-table .standing.bronze { color: var(--bronze); }
+
+  .live-standings-table .player-name {
+    font-weight: 500;
+  }
+
+  .live-standings-table .commander a,
+  .live-commanders-table .commander a {
+    color: var(--accent);
+  }
+
+  .live-standings-table .commander a:hover,
+  .live-commanders-table .commander a:hover {
+    text-decoration: underline;
+  }
+
+  .live-standings-table .unknown,
+  .live-commanders-table .unknown {
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  .live-standings-table .record {
+    font-family: monospace;
+    color: var(--text-secondary);
+  }
+
+  .live-commanders-table .gold { color: var(--gold); font-weight: 600; }
+  .live-commanders-table .silver { color: var(--silver); font-weight: 600; }
+  .live-commanders-table .bronze { color: var(--bronze); font-weight: 600; }
 
   /* Featured Tournaments */
   .featured-tournaments {

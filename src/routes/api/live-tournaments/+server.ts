@@ -44,18 +44,49 @@ async function fetchTournament(tid: string) {
     // Find current round
     const currentRound = rounds.length > 0 ? rounds[rounds.length - 1] : null;
 
-    // Get top standings
-    const topStandings = standings
+    // Process all standings with commanders
+    const allStandings = standings
       .sort((a: any, b: any) => (a.standing || 999) - (b.standing || 999))
-      .slice(0, 16)
       .map((s: any) => ({
         standing: s.standing,
         name: s.name,
+        odl_id: s.odl_id || null,
         wins: s.wins || 0,
         losses: s.losses || 0,
         draws: s.draws || 0,
-        commander: s.decklist?.commander || s.commander || null
+        commander: s.decklist?.commander || s.commander || null,
+        decklist: s.decklist?.link || null
       }));
+
+    // Calculate commander breakdown
+    const commanderCounts: Record<string, { count: number; wins: number; losses: number; draws: number; topStanding: number }> = {};
+    for (const s of allStandings) {
+      const cmd = s.commander || 'Unknown';
+      if (!commanderCounts[cmd]) {
+        commanderCounts[cmd] = { count: 0, wins: 0, losses: 0, draws: 0, topStanding: 999 };
+      }
+      commanderCounts[cmd].count++;
+      commanderCounts[cmd].wins += s.wins;
+      commanderCounts[cmd].losses += s.losses;
+      commanderCounts[cmd].draws += s.draws;
+      if (s.standing < commanderCounts[cmd].topStanding) {
+        commanderCounts[cmd].topStanding = s.standing;
+      }
+    }
+
+    // Sort commanders by count
+    const commanderBreakdown = Object.entries(commanderCounts)
+      .map(([commander, stats]) => ({
+        commander,
+        count: stats.count,
+        metaPct: (stats.count / allStandings.length) * 100,
+        totalWins: stats.wins,
+        totalLosses: stats.losses,
+        totalDraws: stats.draws,
+        winRate: stats.wins / (stats.wins + stats.losses + stats.draws) || 0,
+        topStanding: stats.topStanding
+      }))
+      .sort((a, b) => b.count - a.count);
 
     const result = {
       tid,
@@ -63,7 +94,8 @@ async function fetchTournament(tid: string) {
       totalPlayers: standings.length,
       currentRound: currentRound?.round || null,
       totalRounds: rounds.length,
-      topStandings,
+      topStandings: allStandings.slice(0, 32),
+      commanderBreakdown,
       lastUpdated: new Date().toISOString(),
       fromCache: false
     };
