@@ -69,6 +69,7 @@ export const GET: RequestHandler = async ({ url }) => {
     .eq('player_id', playerId)
     .gte('tournaments.total_players', minSize)
     .eq('tournaments.is_league', false)
+    .eq('tournaments.is_precon', false)
     .gte('tournaments.start_date', start)
     .or('wins.gt.0,losses.gt.0,draws.gt.0');
 

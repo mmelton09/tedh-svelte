@@ -47,6 +47,7 @@ export const GET: RequestHandler = async ({ url }) => {
     .lte('start_date', end)
     .gte('total_players', minSize)
     .eq('is_league', false)
+    .eq('is_precon', false)
     .order('start_date', { ascending: false })
     .limit(10000);
 
