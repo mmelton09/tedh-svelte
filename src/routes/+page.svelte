@@ -30,8 +30,9 @@
   // Mobile column group state
   let mobileColGroup = $state(1);
 
-  // Live tournaments are fetched from server (always, regardless of date/size filters)
-  // To add/remove live tournaments, edit LIVE_TOURNAMENT_IDS in +page.server.ts
+  // NOTE: Live tournament feature removed - TopDeck API doesn't provide commander data
+  // for in-progress tournaments. If this changes in the future, restore from git history
+  // (commit c83346d had inferred deck display, 317831f had simple live links)
 
   // Accordion state - track which rows are expanded and their tournament data
   let expandedRows = $state<Set<string>>(new Set());
@@ -620,19 +621,6 @@
 </div>
 {/if}
 
-<!-- Live Tournaments -->
-{#if data.liveTournaments && data.liveTournaments.length > 0 && !data.selectedTournament}
-<div class="live-tournaments">
-  {#each data.liveTournaments as t}
-    <a href="/tournaments/{t.tid}" class="live-tournament">
-      <span class="live-badge">LIVE</span>
-      <span class="name">{t.tournament_name}</span>
-      <span class="size">{t.total_players} players</span>
-    </a>
-  {/each}
-</div>
-{/if}
-
 <!-- Featured Tournaments -->
 {#if data.recentTournaments && data.recentTournaments.length > 0 && !data.selectedTournament}
 <div class="featured-tournaments">
@@ -1218,64 +1206,6 @@
 
   .stats-summary .muted {
     color: var(--text-muted);
-  }
-
-  /* Live Tournaments */
-  .live-tournaments {
-    display: flex;
-    justify-content: center;
-    gap: 12px;
-    margin: 15px 0;
-    flex-wrap: wrap;
-  }
-
-  .live-tournament {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 14px;
-    background: rgba(239, 68, 68, 0.15);
-    border: 1px solid #ef4444;
-    border-radius: 6px;
-    font-size: 0.9em;
-    animation: pulse-border 2s infinite;
-  }
-
-  @keyframes pulse-border {
-    0%, 100% { border-color: #ef4444; box-shadow: 0 0 5px rgba(239, 68, 68, 0.3); }
-    50% { border-color: #f87171; box-shadow: 0 0 10px rgba(239, 68, 68, 0.5); }
-  }
-
-  .live-badge {
-    background: #ef4444;
-    color: white;
-    padding: 2px 6px;
-    border-radius: 3px;
-    font-size: 0.7em;
-    font-weight: bold;
-    letter-spacing: 0.5px;
-  }
-
-  .live-tournament .name {
-    font-weight: 500;
-    color: var(--text-primary);
-  }
-
-  .live-tournament .size {
-    color: var(--text-muted);
-    font-size: 0.85em;
-  }
-
-  a.live-tournament {
-    text-decoration: none;
-  }
-
-  a.live-tournament:hover {
-    background: rgba(239, 68, 68, 0.25);
-  }
-
-  a.live-tournament:hover .name {
-    color: var(--accent);
   }
 
   /* Featured Tournaments */

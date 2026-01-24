@@ -1,12 +1,6 @@
 import { supabase } from '$lib/supabase';
 import type { PageServerLoad } from './$types';
 
-// Active live tournaments - edit this list when events go live
-const LIVE_TOURNAMENT_IDS = [
-  'the-royal-rumble-the-second-showdown-cedh-12k',
-  'breach-the-bay-cedh-10k'
-];
-
 // Map URL periods to precalc periods
 const PRECALC_PERIODS: Record<string, string> = {
   'all': 'all',
@@ -206,15 +200,9 @@ export const load: PageServerLoad = async ({ url }) => {
     .order('total_players', { ascending: false })
     .limit(50);
 
-  // Fetch live tournaments separately (always, regardless of date/size filters)
-  const { data: liveTournaments } = await supabase
-    .from('tournaments')
-    .select('tid, tournament_name, total_players, start_date')
-    .in('tid', LIVE_TOURNAMENT_IDS);
-
   // If a specific tournament is selected, compute stats for that tournament (live)
   if (tid) {
-    return await loadSingleTournament(tid, period, minSize, recentTournaments || [], liveTournaments || []);
+    return await loadSingleTournament(tid, period, minSize, recentTournaments || []);
   }
 
   // Use precalc table if available and no special filters
@@ -284,7 +272,6 @@ export const load: PageServerLoad = async ({ url }) => {
         period,
         minSize,
         recentTournaments: recentTournaments || [],
-        liveTournaments: liveTournaments || [],
         tournamentCount: tournamentCount || 0,
         selectedTournament: null,
         periodStart: dateRange.start,
@@ -301,7 +288,7 @@ export const load: PageServerLoad = async ({ url }) => {
 
   // Fallback to live calculation (for top player filter or if precalc failed)
   return await loadLiveCalculation(
-    period, minSize, dateRange, recentTournaments || [], liveTournaments || [],
+    period, minSize, dateRange, recentTournaments || [],
     topMode, topValue, topCustom, topStat
   );
 };
@@ -311,8 +298,7 @@ async function loadSingleTournament(
   tid: string,
   period: string,
   minSize: number,
-  recentTournaments: any[],
-  liveTournaments: any[]
+  recentTournaments: any[]
 ) {
   const { data: tournament } = await supabase
     .from('tournaments')
@@ -327,7 +313,6 @@ async function loadSingleTournament(
       minSize,
       totalEntries: 0,
       recentTournaments,
-      liveTournaments,
       tournamentCount: 0,
       selectedTournament: null,
     };
@@ -358,7 +343,6 @@ async function loadSingleTournament(
     period,
     minSize,
     recentTournaments,
-    liveTournaments,
     tournamentCount: 1,
     selectedTournament: tournament,
     periodStart: tournament.start_date,
@@ -372,7 +356,6 @@ async function loadLiveCalculation(
   minSize: number,
   dateRange: { start: string; end: string; label: string },
   recentTournaments: any[],
-  liveTournaments: any[],
   topMode: string,
   topValue: string,
   topCustom: number,
@@ -395,7 +378,6 @@ async function loadLiveCalculation(
       period,
       minSize,
       recentTournaments,
-      liveTournaments,
       tournamentCount: 0,
       selectedTournament: null,
       periodStart: dateRange.start,
@@ -503,7 +485,6 @@ async function loadLiveCalculation(
     period,
     minSize,
     recentTournaments,
-    liveTournaments,
     tournamentCount: tournaments.length,
     selectedTournament: null,
     periodStart: dateRange.start,
