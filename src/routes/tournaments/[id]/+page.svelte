@@ -7,6 +7,43 @@
   // Expanded rows state
   let expandedRows = $state<Set<number>>(new Set());
 
+  // Sorting state
+  let sortCol = $state<'standing' | 'player' | 'commander' | 'record'>('standing');
+  let sortAsc = $state(true);
+
+  function toggleSort(col: typeof sortCol) {
+    if (sortCol === col) {
+      sortAsc = !sortAsc;
+    } else {
+      sortCol = col;
+      sortAsc = col === 'standing'; // Default asc for standing, desc for others
+    }
+  }
+
+  let sortedStandings = $derived.by(() => {
+    const standings = [...(data.standings || [])];
+    return standings.sort((a, b) => {
+      let cmp = 0;
+      switch (sortCol) {
+        case 'standing':
+          cmp = a.standing - b.standing;
+          break;
+        case 'player':
+          cmp = getPlayerName(a).localeCompare(getPlayerName(b));
+          break;
+        case 'commander':
+          cmp = getCommanderPair(a).localeCompare(getCommanderPair(b));
+          break;
+        case 'record':
+          const rA = getRecord(a), rB = getRecord(b);
+          cmp = (rB.wins - rB.losses) - (rA.wins - rA.losses); // Better record first
+          if (cmp === 0) cmp = rB.wins - rA.wins;
+          break;
+      }
+      return sortAsc ? cmp : -cmp;
+    });
+  });
+
   function toggleRow(standing: number) {
     const newSet = new Set(expandedRows);
     if (newSet.has(standing)) {
@@ -223,16 +260,24 @@
   <table>
     <thead>
       <tr>
-        <th style="width: 50px">#</th>
-        <th>Player</th>
+        <th style="width: 50px" class="sortable" class:sorted={sortCol === 'standing'} onclick={() => toggleSort('standing')}>
+          # {sortCol === 'standing' ? (sortAsc ? '▲' : '▼') : ''}
+        </th>
+        <th class="sortable" class:sorted={sortCol === 'player'} onclick={() => toggleSort('player')}>
+          Player {sortCol === 'player' ? (sortAsc ? '▲' : '▼') : ''}
+        </th>
         <th class="colors-col"></th>
-        <th>Commander</th>
-        <th class="metric">Record</th>
+        <th class="sortable" class:sorted={sortCol === 'commander'} onclick={() => toggleSort('commander')}>
+          Commander {sortCol === 'commander' ? (sortAsc ? '▲' : '▼') : ''}
+        </th>
+        <th class="metric sortable" class:sorted={sortCol === 'record'} onclick={() => toggleSort('record')}>
+          Record {sortCol === 'record' ? (sortAsc ? '▲' : '▼') : ''}
+        </th>
         <th style="width: 50px">List</th>
       </tr>
     </thead>
     <tbody>
-      {#each data.standings as entry}
+      {#each sortedStandings as entry}
         {@const isTopCut = data.tournament.top_cut && entry.standing <= data.tournament.top_cut}
         {@const isExpanded = expandedRows.has(entry.standing)}
         <tr
@@ -442,6 +487,19 @@
 
   .negative {
     color: var(--negative);
+  }
+
+  th.sortable {
+    cursor: pointer;
+    user-select: none;
+  }
+
+  th.sortable:hover {
+    color: var(--accent);
+  }
+
+  th.sorted {
+    color: var(--accent);
   }
 
   .standing-cell {
