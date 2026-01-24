@@ -166,6 +166,26 @@ export const load: PageServerLoad = async ({ params, url }) => {
     }
   }
 
+  // Calculate live records from match data (for live tournaments where standings don't have W/L)
+  const liveRecords: Record<string, { wins: number; losses: number; draws: number }> = {};
+  for (const match of matches || []) {
+    const players = (match.match_players as any[]) || [];
+    for (const mp of players) {
+      if (!liveRecords[mp.player_id]) {
+        liveRecords[mp.player_id] = { wins: 0, losses: 0, draws: 0 };
+      }
+
+      if (match.winner_id === mp.player_id) {
+        liveRecords[mp.player_id].wins++;
+      } else if (match.winner_id && match.winner_id !== 'Draw') {
+        liveRecords[mp.player_id].losses++;
+      } else {
+        // Draw or no winner recorded
+        liveRecords[mp.player_id].draws++;
+      }
+    }
+  }
+
   // Get color identities for all commanders in this tournament
   const allCommanderNames = new Set<string>();
   for (const s of standings || []) {
@@ -323,6 +343,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
     vsAvg,
     seatWinRates,
     playerMatches,
-    colorMap
+    colorMap,
+    liveRecords
   };
 };

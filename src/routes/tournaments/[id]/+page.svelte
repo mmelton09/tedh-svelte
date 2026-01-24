@@ -92,6 +92,26 @@
     if (val < 0) return 'negative';
     return '';
   }
+
+  // Get record - use live records from match data if entry has 0-0-0
+  function getRecord(entry: any): { wins: number; losses: number; draws: number } {
+    // If entry has a real record, use it
+    if (entry.wins > 0 || entry.losses > 0 || entry.draws > 0) {
+      return { wins: entry.wins, losses: entry.losses, draws: entry.draws };
+    }
+    // Otherwise, use live records calculated from match data
+    const playerId = getPlayerId(entry);
+    const live = data.liveRecords?.[playerId];
+    if (live) {
+      return live;
+    }
+    return { wins: 0, losses: 0, draws: 0 };
+  }
+
+  function formatRecord(entry: any): string {
+    const r = getRecord(entry);
+    return `${r.wins}-${r.losses}-${r.draws}`;
+  }
 </script>
 
 <!-- Tournament Navigation -->
@@ -241,7 +261,7 @@
               {getCommanderPair(entry)}
             </a>
           </td>
-          <td class="metric">{entry.wins}-{entry.losses}-{entry.draws}</td>
+          <td class="metric">{formatRecord(entry)}</td>
           <td class="list-cell" onclick={(e) => e.stopPropagation()}>
             {#if getDecklistUrl(entry.decklist)}
               <a href={getDecklistUrl(entry.decklist)} target="_blank" rel="noopener" title="View on external site">📋</a>
