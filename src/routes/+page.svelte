@@ -1596,6 +1596,17 @@
   }
 
   /* Table styles */
+  thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  thead th {
+    background: var(--bg-secondary);
+    border-bottom: 2px solid var(--border);
+  }
+
   .rank-cell {
     color: var(--text-muted);
     text-align: center;
