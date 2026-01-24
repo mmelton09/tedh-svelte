@@ -30,17 +30,8 @@
   // Mobile column group state
   let mobileColGroup = $state(1);
 
-  // Live tournaments - these should be imported to DB via fetch_single_tournament.py
-  // Edit this list when tournaments go live
-  const LIVE_TOURNAMENT_IDS = [
-    'the-royal-rumble-the-second-showdown-cedh-12k',
-    'breach-the-bay-cedh-10k'
-  ];
-
-  // Find live tournaments from the recent tournaments data
-  let liveTournaments = $derived(
-    data.recentTournaments?.filter(t => LIVE_TOURNAMENT_IDS.includes(t.tid)) || []
-  );
+  // Live tournaments are fetched from server (always, regardless of date/size filters)
+  // To add/remove live tournaments, edit LIVE_TOURNAMENT_IDS in +page.server.ts
 
   // Accordion state - track which rows are expanded and their tournament data
   let expandedRows = $state<Set<string>>(new Set());
@@ -630,9 +621,9 @@
 {/if}
 
 <!-- Live Tournaments -->
-{#if liveTournaments.length > 0 && !data.selectedTournament}
+{#if data.liveTournaments && data.liveTournaments.length > 0 && !data.selectedTournament}
 <div class="live-tournaments">
-  {#each liveTournaments as t}
+  {#each data.liveTournaments as t}
     <div class="live-tournament">
       <span class="live-badge">LIVE</span>
       <span class="size" onclick={() => selectTournament(t.tid)} title="Filter meta by this tournament">{t.total_players}</span>
