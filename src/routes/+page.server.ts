@@ -2,8 +2,8 @@ import { supabase } from '$lib/supabase';
 import type { PageServerLoad } from './$types';
 
 // Active live tournaments - edit this list when events go live
-const LIVE_TOURNAMENT_IDS = [
-  'the-royal-rumble-the-second-showdown-cedh-12k'
+const LIVE_TOURNAMENT_IDS: string[] = [
+  // No live tournaments currently
 ];
 
 // Map URL periods to precalc periods
