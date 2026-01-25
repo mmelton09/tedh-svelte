@@ -503,21 +503,23 @@
   }
 
   .standing-cell {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 0.5rem;
+    width: 100%;
   }
 
   .expand-icon {
     font-size: 0.7rem;
     color: var(--text-muted);
     cursor: pointer;
-    width: 0.7rem;
+    width: 0.8rem;
+    text-align: center;
     flex-shrink: 0;
   }
 
   .standing-cell span:last-child {
-    min-width: 1.5rem;
+    min-width: 1.8rem;
     text-align: right;
   }
 
