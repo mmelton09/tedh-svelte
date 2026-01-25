@@ -285,11 +285,13 @@
           class:expanded={isExpanded}
           onclick={() => toggleRow(entry.standing)}
         >
-          <td class="standing-cell">
-            <span class="expand-icon">{isExpanded ? '▼' : '▶'}</span>
-            <span class:gold={entry.standing === 1} class:silver={entry.standing === 2} class:bronze={entry.standing === 3}>
-              {entry.standing}
-            </span>
+          <td>
+            <div class="standing-cell">
+              <span class="expand-icon">{isExpanded ? '▼' : '▶'}</span>
+              <span class:gold={entry.standing === 1} class:silver={entry.standing === 2} class:bronze={entry.standing === 3}>
+                {entry.standing}
+              </span>
+            </div>
           </td>
           <td>
             <a href="/players/{getPlayerId(entry)}" onclick={(e) => e.stopPropagation()}>
@@ -503,10 +505,9 @@
   }
 
   .standing-cell {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     gap: 0.5rem;
-    width: 100%;
   }
 
   .expand-icon {
