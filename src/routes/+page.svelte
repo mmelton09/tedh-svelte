@@ -254,6 +254,9 @@
 
   // Period options for toggles
   const periodGroups = {
+    live: [
+      { value: 'this_weekend', label: 'This Wknd' }
+    ],
     recent: [
       { value: 'last_week', label: 'Last Week' }
     ],
@@ -512,6 +515,16 @@
 
 <!-- Time Period Toggle -->
 <div class="period-toggle">
+  <span class="period-group live-group">
+    {#each periodGroups.live as p}
+      <button
+        class="period-btn period-btn-live"
+        class:active={data.period === p.value}
+        onclick={() => updatePeriod(p.value)}
+      >{p.label}</button>
+    {/each}
+  </span>
+  <span class="period-separator">|</span>
   <span class="period-group">
     {#each periodGroups.recent as p}
       <button
@@ -620,22 +633,12 @@
 </div>
 {/if}
 
-<!-- Live Tournaments -->
-{#if data.liveTournaments && data.liveTournaments.length > 0 && !data.selectedTournament}
-<div class="live-tournaments">
-  {#each data.liveTournaments as t}
-    <a href="/tournaments/{t.tid}" class="live-tournament">
-      <span class="live-badge">LIVE</span>
-      <span class="name">{t.tournament_name}</span>
-      <span class="size">{t.total_players} players</span>
-    </a>
-  {/each}
-</div>
-{/if}
-
-<!-- Featured Tournaments -->
-{#if data.recentTournaments && data.recentTournaments.length > 0 && !data.selectedTournament}
-<div class="featured-tournaments">
+<!-- Tournaments Bar: Live first, then completed -->
+{#if (data.liveTournaments?.length > 0 || data.recentTournaments?.length > 0) && !data.selectedTournament}
+{@const liveTids = new Set(data.liveTournaments?.map(t => t.tid) || [])}
+{@const completedTournaments = data.recentTournaments?.filter(t => !liveTids.has(t.tid)) || []}
+{@const slotsForCompleted = Math.max(0, 3 - (data.liveTournaments?.length || 0))}
+<div class="tournaments-bar">
   <div class="tournament-search-container">
     <input
       type="text"
@@ -657,8 +660,15 @@
       </div>
     {/if}
   </div>
-  {#each data.recentTournaments.slice(0, 1) as t}
-    <div class="featured-tournament" onclick={() => selectTournament(t.tid)}>
+  {#each data.liveTournaments || [] as t}
+    <a href="/tournaments/{t.tid}" class="tournament-item live">
+      <span class="live-badge">LIVE</span>
+      <span class="name">{t.tournament_name}</span>
+      <span class="size">{t.total_players} players</span>
+    </a>
+  {/each}
+  {#each completedTournaments.slice(0, slotsForCompleted) as t}
+    <div class="tournament-item" onclick={() => selectTournament(t.tid)}>
       <span class="size">{t.total_players}</span>
       <a href="/tournaments/{t.tid}" class="name" onclick={(e) => e.stopPropagation()}>{t.tournament_name}</a>
     </div>
@@ -1185,6 +1195,24 @@
     border-color: var(--accent);
   }
 
+  .period-btn-live {
+    border-color: #ef4444;
+    color: #ef4444;
+  }
+
+  .period-btn-live:hover {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: #ef4444;
+    color: #ef4444;
+  }
+
+  .period-btn-live.active {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+    border-color: #ef4444;
+    animation: pulse-border 2s infinite;
+  }
+
   .period-separator {
     color: var(--border);
     padding: 0 5px;
@@ -1220,25 +1248,84 @@
     color: var(--text-muted);
   }
 
-  /* Live Tournaments */
-  .live-tournaments {
+  /* Tournaments Bar */
+  .tournaments-bar {
     display: flex;
-    justify-content: center;
-    gap: 12px;
-    margin: 15px 0;
-    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin: 12px 0;
+    padding: 12px;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    overflow: visible;
+    position: relative;
+    z-index: 50;
   }
 
-  .live-tournament {
+  .tournament-item {
     display: flex;
     align-items: center;
     gap: 8px;
     padding: 8px 14px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-primary);
+    text-decoration: none;
+    font-size: 0.85em;
+    transition: all 0.2s;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .tournament-item:hover {
+    background: #333;
+    border-color: var(--accent);
+  }
+
+  .tournament-item .size {
+    background: var(--accent);
+    color: var(--bg-primary);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 0.9em;
+  }
+
+  .tournament-item .name {
+    color: var(--accent);
+    max-width: 250px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-decoration: none;
+  }
+
+  /* Live tournament styling */
+  .tournament-item.live {
     background: rgba(239, 68, 68, 0.15);
     border: 1px solid #ef4444;
-    border-radius: 6px;
-    font-size: 0.9em;
     animation: pulse-border 2s infinite;
+  }
+
+  .tournament-item.live .name {
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  .tournament-item.live .size {
+    background: transparent;
+    color: var(--text-muted);
+    padding: 0;
+    font-weight: normal;
+    font-size: 0.85em;
+  }
+
+  a.tournament-item.live:hover {
+    background: rgba(239, 68, 68, 0.25);
+  }
+
+  a.tournament-item.live:hover .name {
+    color: var(--accent);
   }
 
   @keyframes pulse-border {
@@ -1254,42 +1341,6 @@
     font-size: 0.7em;
     font-weight: bold;
     letter-spacing: 0.5px;
-  }
-
-  .live-tournament .name {
-    font-weight: 500;
-    color: var(--text-primary);
-  }
-
-  .live-tournament .size {
-    color: var(--text-muted);
-    font-size: 0.85em;
-  }
-
-  a.live-tournament {
-    text-decoration: none;
-  }
-
-  a.live-tournament:hover {
-    background: rgba(239, 68, 68, 0.25);
-  }
-
-  a.live-tournament:hover .name {
-    color: var(--accent);
-  }
-
-  /* Featured Tournaments */
-  .featured-tournaments {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin: 12px 0;
-    padding: 12px;
-    background: var(--bg-secondary);
-    border-radius: 8px;
-    overflow: visible;
-    position: relative;
-    z-index: 50;
   }
 
   .tournament-search-container {
@@ -1336,55 +1387,6 @@
     font-size: 0.85em;
   }
 
-  .featured-tournament {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 14px;
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    color: var(--text-primary);
-    text-decoration: none;
-    font-size: 0.85em;
-    transition: all 0.2s;
-    white-space: nowrap;
-    cursor: pointer;
-  }
-
-  .featured-tournament:hover {
-    background: #333;
-  }
-
-  .featured-tournament:hover:not(:has(.name:hover)) {
-    border-color: var(--accent);
-  }
-
-  .featured-tournament .size {
-    background: var(--accent);
-    color: var(--bg-primary);
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-weight: bold;
-    font-size: 0.9em;
-  }
-
-  .featured-tournament .name {
-    color: var(--accent);
-    max-width: 250px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    text-decoration: none;
-  }
-
-  .featured-tournament .name:hover {
-    text-decoration: underline;
-  }
-
-  .featured-tournament:has(.name:hover) {
-    border-color: var(--border);
-    cursor: default;
-  }
 
   /* Selected Tournament Banner */
   .selected-tournament-banner {
@@ -1960,7 +1962,7 @@
       display: none;
     }
 
-    .featured-tournaments {
+    .tournaments-bar {
       display: none;
     }
 

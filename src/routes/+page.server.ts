@@ -47,6 +47,7 @@ function getPeriodLabel(period: string): string {
     '3m': 'Last 3 Months',
     '1m': 'Last 30 Days',
     'post_ban': 'Post-RC Era',
+    'this_weekend': 'This Weekend',
     'last_week': 'Last Week',
     'current_month': now.toLocaleDateString('en-US', { month: 'long' }),
     'prev_month': new Date(now.getFullYear(), now.getMonth() - 1, 1).toLocaleDateString('en-US', { month: 'long' }),
@@ -63,6 +64,35 @@ function getDateRange(period: string): { start: string; end: string; label: stri
   let start: Date;
   let label: string;
   switch (period) {
+    case 'this_weekend': {
+      // Friday through Sunday of current week
+      const dayOfWeek = now.getDay(); // 0 = Sunday, 5 = Friday, 6 = Saturday
+      let fridayOffset: number;
+      if (dayOfWeek === 0) {
+        // Sunday: go back 2 days to Friday
+        fridayOffset = -2;
+      } else if (dayOfWeek === 6) {
+        // Saturday: go back 1 day to Friday
+        fridayOffset = -1;
+      } else if (dayOfWeek === 5) {
+        // Friday: today
+        fridayOffset = 0;
+      } else {
+        // Mon-Thu: go back to previous Friday
+        fridayOffset = -(dayOfWeek + 2);
+      }
+      const friday = new Date(now);
+      friday.setDate(now.getDate() + fridayOffset);
+      const sunday = new Date(friday);
+      sunday.setDate(friday.getDate() + 2);
+      // If Sunday is in the future, use today as end
+      const endDate = sunday > now ? now : sunday;
+      return {
+        start: friday.toISOString().split('T')[0],
+        end: endDate.toISOString().split('T')[0],
+        label: 'This Weekend'
+      };
+    }
     case 'last_week': {
       start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       label = 'Last Week';
@@ -168,7 +198,7 @@ function getComparisonDateRange(period: string): { start: string; end: string } 
       return { start: prevStart.toISOString().split('T')[0], end: prevEnd.toISOString().split('T')[0] };
     }
     default:
-      return null; // 'all', 'post_ban', 'custom' have no comparison
+      return null; // 'all', 'post_ban', 'custom', 'this_weekend' have no comparison
   }
 }
 
