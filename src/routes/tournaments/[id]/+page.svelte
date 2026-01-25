@@ -512,6 +512,13 @@
     font-size: 0.7rem;
     color: var(--text-muted);
     cursor: pointer;
+    width: 0.7rem;
+    flex-shrink: 0;
+  }
+
+  .standing-cell span:last-child {
+    min-width: 1.5rem;
+    text-align: right;
   }
 
   tbody tr {
