@@ -3,8 +3,7 @@ import type { PageServerLoad } from './$types';
 
 // Active live tournaments - edit this list when events go live
 const LIVE_TOURNAMENT_IDS = [
-  'the-royal-rumble-the-second-showdown-cedh-12k',
-  'breach-the-bay-cedh-10k'
+  'the-royal-rumble-the-second-showdown-cedh-12k'
 ];
 
 // Map URL periods to precalc periods
