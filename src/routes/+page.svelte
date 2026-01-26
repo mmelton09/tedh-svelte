@@ -1280,7 +1280,19 @@
 
   .tournament-item:hover {
     background: #333;
+  }
+
+  .tournament-item:hover:not(:has(.name:hover)) {
     border-color: var(--accent);
+  }
+
+  .tournament-item .name:hover {
+    text-decoration: underline;
+  }
+
+  .tournament-item:has(.name:hover) {
+    border-color: var(--border);
+    cursor: default;
   }
 
   .tournament-item .size {
