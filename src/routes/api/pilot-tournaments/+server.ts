@@ -67,6 +67,7 @@ export const GET: RequestHandler = async ({ url }) => {
       )
     `)
     .eq('player_id', playerId)
+    .eq('played', true)
     .gte('tournaments.total_players', minSize)
     .eq('tournaments.is_league', false)
     .eq('tournaments.is_precon', false)

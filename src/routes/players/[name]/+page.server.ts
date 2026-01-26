@@ -122,6 +122,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
       )
     `)
     .eq('player_id', playerStats.player_id)
+    .eq('played', true)
     .gte('tournaments.total_players', minSize)
     .eq('tournaments.is_league', false)
     .eq('tournaments.is_precon', false);
