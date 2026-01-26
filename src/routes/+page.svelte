@@ -668,10 +668,10 @@
     </a>
   {/each}
   {#each completedTournaments.slice(0, slotsForCompleted) as t}
-    <div class="tournament-item" onclick={() => selectTournament(t.tid)}>
+    <a href="/tournaments/{t.tid}" class="tournament-item">
       <span class="size">{t.total_players}</span>
-      <a href="/tournaments/{t.tid}" class="name" onclick={(e) => e.stopPropagation()}>{t.tournament_name}</a>
-    </div>
+      <span class="name">{t.tournament_name}</span>
+    </a>
   {/each}
 </div>
 {/if}
