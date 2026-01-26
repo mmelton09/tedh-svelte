@@ -646,6 +646,7 @@
       placeholder="Search tournaments..."
       bind:value={tournamentSearch}
       onfocus={() => showTournamentDropdown = true}
+      onblur={() => setTimeout(() => showTournamentDropdown = false, 150)}
     />
     {#if showTournamentDropdown}
       <div class="tournament-dropdown">
