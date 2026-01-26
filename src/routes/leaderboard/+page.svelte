@@ -462,6 +462,14 @@
   AvgX% = Average placement percentile (100% = always 1st)
 </div>
 
+<!-- ELO Methodology -->
+<div class="methodology">
+  <strong>ELO Methodology:</strong>
+  Rankings use <a href="https://openskill.me" target="_blank" rel="noopener">OpenSkill</a> (Plackett-Luce model) calculated from pod results in 30+ player tournaments with complete match data.
+  Each pod is treated as a 4-player free-for-all where the winner places 1st and others tie for 2nd.
+  New players start at 1500. Only "ranked" games (tournaments with complete pod data) affect ELO.
+</div>
+
 {#if data.players.length === 0}
   <p class="empty-state">No players found matching your criteria.</p>
 {/if}
@@ -859,6 +867,24 @@
 
   .legend strong {
     color: var(--text-primary);
+  }
+
+  .methodology {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.85em;
+    padding: 12px;
+    margin: 10px 0;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+  }
+
+  .methodology strong {
+    color: var(--text-primary);
+  }
+
+  .methodology a {
+    color: var(--accent);
   }
 
   .empty-state {
