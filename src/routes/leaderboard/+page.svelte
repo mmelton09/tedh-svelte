@@ -691,13 +691,6 @@
   }
 
   /* Table */
-  .table-container {
-    max-height: 70vh;
-    overflow-y: auto;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-  }
-
   thead {
     position: sticky;
     top: 0;
