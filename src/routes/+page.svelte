@@ -1320,11 +1320,11 @@
     font-size: 0.85em;
   }
 
-  a.tournament-item.live:hover {
+  .tournament-item.live:hover {
     background: rgba(239, 68, 68, 0.25);
   }
 
-  a.tournament-item.live:hover .name {
+  .tournament-item.live:hover .name {
     color: var(--accent);
   }
 
