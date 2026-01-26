@@ -661,17 +661,17 @@
     {/if}
   </div>
   {#each data.liveTournaments || [] as t}
-    <button class="tournament-item live" onclick={() => selectTournament(t.tid)}>
+    <div class="tournament-item live" role="button" tabindex="0" onclick={() => selectTournament(t.tid)} onkeydown={(e) => e.key === 'Enter' && selectTournament(t.tid)}>
       <span class="live-badge">LIVE</span>
       <a href="/tournaments/{t.tid}" class="name" onclick={(e) => e.stopPropagation()}>{t.tournament_name}</a>
       <span class="size">{t.total_players} players</span>
-    </button>
+    </div>
   {/each}
   {#each completedTournaments.slice(0, slotsForCompleted) as t}
-    <button class="tournament-item" onclick={() => selectTournament(t.tid)}>
+    <div class="tournament-item" role="button" tabindex="0" onclick={() => selectTournament(t.tid)} onkeydown={(e) => e.key === 'Enter' && selectTournament(t.tid)}>
       <span class="size">{t.total_players}</span>
       <a href="/tournaments/{t.tid}" class="name" onclick={(e) => e.stopPropagation()}>{t.tournament_name}</a>
-    </button>
+    </div>
   {/each}
 </div>
 {/if}
