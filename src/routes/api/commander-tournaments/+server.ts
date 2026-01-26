@@ -76,7 +76,6 @@ export const GET: RequestHandler = async ({ url }) => {
         deck_commanders (commander_name)
       `)
       .in('tid', batch)
-      .or('wins.gt.0,losses.gt.0,draws.gt.0')
       .limit(100000);
 
     if (batchError) {

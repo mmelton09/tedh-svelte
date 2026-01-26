@@ -98,6 +98,23 @@ Key patterns from original site:
 - **Player matches**: Organized by player_id, keyed by round_number
 - **Color identity**: Uses mana-font CDN icons
 
+## When Adding Features: Don't Break Existing Functionality
+
+**Before modifying working code:**
+1. Note the last working commit hash
+2. Understand ALL the code involved (HTML, CSS, JS) - not just the part you're changing
+3. When renaming classes or restructuring, copy ALL related CSS rules
+
+**When something breaks:**
+1. FIRST step: `git show <last-working-commit>:path/to/file` to see exactly what worked
+2. Compare the working version to current - don't guess at fixes
+3. The answer is in the diff, not in trying random changes
+
+**Common pitfalls:**
+- Changing `div` to `button` breaks nested interactive elements (anchors, buttons)
+- Renaming CSS classes without copying all associated rules (especially `:has()`, `:hover`, etc.)
+- Changing element structure without updating all selectors
+
 ## Common Issues & Solutions
 
 1. **0 data showing**: Check batching on `.in()` queries

@@ -456,7 +456,6 @@ async function loadLiveCalculation(
         deck_commanders (commander_name)
       `)
       .in('tid', batch)
-      .or('wins.gt.0,losses.gt.0,draws.gt.0')
       .limit(100000);
     if (batchEntries) {
       entries = entries.concat(batchEntries);
@@ -747,7 +746,6 @@ async function fetchComparisonStats(
         deck_commanders (commander_name)
       `)
       .in('tid', batch)
-      .or('wins.gt.0,losses.gt.0,draws.gt.0')
       .limit(100000);
     if (batchEntries) {
       entries = entries.concat(batchEntries);

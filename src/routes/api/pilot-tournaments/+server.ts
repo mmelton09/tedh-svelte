@@ -70,8 +70,7 @@ export const GET: RequestHandler = async ({ url }) => {
     .gte('tournaments.total_players', minSize)
     .eq('tournaments.is_league', false)
     .eq('tournaments.is_precon', false)
-    .gte('tournaments.start_date', start)
-    .or('wins.gt.0,losses.gt.0,draws.gt.0');
+    .gte('tournaments.start_date', start);
 
   // Filter by has_pod_data if ranked
   if (dataType === 'ranked') {
