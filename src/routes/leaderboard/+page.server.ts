@@ -118,16 +118,13 @@ export const load: PageServerLoad = async ({ url }) => {
   const sortColumn = sortColumnMap[sortBy] || 'openskill_elo';
 
   // Build query for precalc table
+  const dataType = rankedOnly ? 'ranked' : 'all';
   let query = supabase
     .from('leaderboard_stats')
     .select('*', { count: 'exact' })
+    .eq('data_type', dataType)
     .eq('period', precalcPeriod)
     .eq('min_size', precalcMinSize);
-
-  // Apply ranked filter (10+ games)
-  if (rankedOnly) {
-    query = query.gte('openskill_games', 10);
-  }
 
   // Apply min entries filter
   if (minEntries > 1) {
@@ -183,13 +180,10 @@ export const load: PageServerLoad = async ({ url }) => {
   let gamesQuery = supabase
     .from('leaderboard_stats')
     .select('total_wins, total_losses, total_draws')
+    .eq('data_type', dataType)
     .eq('period', precalcPeriod)
     .eq('min_size', precalcMinSize)
     .gte('entries', minEntries);
-
-  if (rankedOnly) {
-    gamesQuery = gamesQuery.gte('openskill_games', 10);
-  }
 
   const { data: gamesData } = await gamesQuery.limit(100000);
 
@@ -218,13 +212,10 @@ export const load: PageServerLoad = async ({ url }) => {
       let rankQuery = supabase
         .from('leaderboard_stats')
         .select('*', { count: 'exact', head: true })
+        .eq('data_type', dataType)
         .eq('period', precalcPeriod)
         .eq('min_size', precalcMinSize)
         .gt('openskill_elo', p.openskill_elo);
-
-      if (rankedOnly) {
-        rankQuery = rankQuery.gte('openskill_games', 10);
-      }
 
       const { count: higherCount } = await rankQuery;
       eloRank = (higherCount || 0) + 1;
@@ -263,14 +254,11 @@ export const load: PageServerLoad = async ({ url }) => {
   let statsQuery = supabase
     .from('leaderboard_stats')
     .select('openskill_elo')
+    .eq('data_type', dataType)
     .eq('period', precalcPeriod)
     .eq('min_size', precalcMinSize)
     .gte('entries', minEntries)
     .not('openskill_elo', 'is', null);
-
-  if (rankedOnly) {
-    statsQuery = statsQuery.gte('openskill_games', 10);
-  }
 
   const { data: statsData } = await statsQuery;
 
