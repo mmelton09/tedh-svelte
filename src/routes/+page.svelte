@@ -1,15 +1,20 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
+  import { onMount } from 'svelte';
 
   let { data } = $props();
 
+  // Preset handling
+  const preset = $page.url.searchParams.get('preset');
+  const isCommandersPreset = preset === 'commanders';
+
   // Filter state (client-side for instant updates)
-  let minEntries = $state(1);
+  let minEntries = $state(isCommandersPreset ? 5 : 1);
   let minConv = $state(0);
-  let sortCol = $state<string>('entries');
+  let sortCol = $state<string>(isCommandersPreset ? 'conversion_rate' : 'entries');
   let sortAsc = $state(false);
-  let showVsExpected = $state(false);
+  let showVsExpected = $state(isCommandersPreset);
   let showDelta = $state(false);
   let showMedals = $state(false);
   let showGuide = $state(false);
@@ -29,7 +34,7 @@
   let commanderSearch = $state('');
 
   // Benchmark mode
-  let benchmarkMode = $state(false);
+  let benchmarkMode = $state(isCommandersPreset);
   let benchmarkCommander = $state<string | null>(null);
   let benchmarkSearch = $state('');
   let benchmarkShowDropdown = $state(false);
@@ -97,6 +102,15 @@
     return data.commanders
       .filter((c: any) => c.commander_pair.toLowerCase().includes(search))
       .slice(0, 8);
+  });
+
+  // Clean preset param from URL after applying
+  onMount(() => {
+    if (preset) {
+      const params = new URLSearchParams($page.url.searchParams);
+      params.delete('preset');
+      goto(`?${params.toString()}`, { replaceState: true });
+    }
   });
 
   // Mobile column group state
