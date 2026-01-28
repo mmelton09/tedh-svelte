@@ -149,6 +149,35 @@
     const r = getRecord(entry);
     return `${r.wins}-${r.losses}-${r.draws}`;
   }
+
+  let tournamentSearch = $state('');
+  let tournamentResults = $state<any[]>([]);
+  let showTournamentDropdown = $state(false);
+  let searchTimeout: ReturnType<typeof setTimeout>;
+
+  function onTournamentSearch(query: string) {
+    tournamentSearch = query;
+    clearTimeout(searchTimeout);
+    if (query.length < 2) {
+      tournamentResults = [];
+      return;
+    }
+    searchTimeout = setTimeout(async () => {
+      const res = await fetch(`/api/tournament-search?q=${encodeURIComponent(query)}`);
+      tournamentResults = await res.json();
+    }, 200);
+  }
+
+  function selectTournament(tid: string) {
+    showTournamentDropdown = false;
+    tournamentSearch = '';
+    tournamentResults = [];
+    goto(`/tournaments/${tid}`);
+  }
+
+  function formatSearchDate(dateStr: string): string {
+    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+  }
 </script>
 
 <!-- Tournament Navigation -->
@@ -173,18 +202,41 @@
 
   <div class="nav-center">
     <h1>{data.tournament.tournament_name}</h1>
-    <div class="size-filter">
-      Event Size:
-      <select
-        value={data.minSize}
-        onchange={(e) => updateMinSize(parseInt(e.currentTarget.value))}
-      >
-        <option value={16}>16+</option>
-        <option value={30}>30+</option>
-        <option value={50}>50+</option>
-        <option value={100}>100+</option>
-        <option value={250}>250+</option>
-      </select>
+    <div class="tournament-search-row">
+      <div class="tournament-search-container">
+        <input
+          type="text"
+          class="tournament-search-input"
+          placeholder="Search tournaments..."
+          bind:value={tournamentSearch}
+          oninput={(e) => onTournamentSearch(e.currentTarget.value)}
+          onfocus={() => showTournamentDropdown = true}
+          onblur={() => setTimeout(() => showTournamentDropdown = false, 150)}
+        />
+        {#if showTournamentDropdown && tournamentResults.length > 0}
+          <div class="tournament-search-dropdown">
+            {#each tournamentResults as t}
+              <div class="tournament-search-option" onmousedown={() => selectTournament(t.tid)}>
+                {t.tournament_name}
+                <span class="search-meta">{formatSearchDate(t.start_date)} · {t.total_players}p</span>
+              </div>
+            {/each}
+          </div>
+        {/if}
+      </div>
+      <div class="size-filter">
+        Event Size:
+        <select
+          value={data.minSize}
+          onchange={(e) => updateMinSize(parseInt(e.currentTarget.value))}
+        >
+          <option value={16}>16+</option>
+          <option value={30}>30+</option>
+          <option value={50}>50+</option>
+          <option value={100}>100+</option>
+          <option value={250}>250+</option>
+        </select>
+      </div>
     </div>
   </div>
 
@@ -417,6 +469,64 @@
   .nav-center h1 {
     font-size: 1.25rem;
     margin-bottom: 0.5rem;
+  }
+
+  .tournament-search-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .tournament-search-container {
+    position: relative;
+  }
+
+  .tournament-search-input {
+    padding: 4px 10px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    width: 200px;
+  }
+
+  .tournament-search-input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .tournament-search-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 350px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-top: 2px;
+    z-index: 50;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .tournament-search-option {
+    padding: 8px 10px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+  }
+
+  .tournament-search-option:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+  }
+
+  .search-meta {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-muted);
   }
 
   .size-filter {

@@ -131,10 +131,55 @@
     };
     return labels[period] || period;
   }
+
+  let playerSearch = $state('');
+  let playerResults = $state<any[]>([]);
+  let showPlayerDropdown = $state(false);
+  let searchTimeout: ReturnType<typeof setTimeout>;
+
+  function onPlayerSearch(query: string) {
+    playerSearch = query;
+    clearTimeout(searchTimeout);
+    if (query.length < 2) {
+      playerResults = [];
+      return;
+    }
+    searchTimeout = setTimeout(async () => {
+      const res = await fetch(`/api/player-search?q=${encodeURIComponent(query)}`);
+      playerResults = await res.json();
+    }, 200);
+  }
+
+  function selectPlayer(name: string) {
+    showPlayerDropdown = false;
+    playerSearch = '';
+    playerResults = [];
+    goto(`/players/${encodeURIComponent(name)}`);
+  }
 </script>
 
 <div class="page-header">
   <h1>{data.playerName}</h1>
+  <div class="header-search">
+    <input
+      type="text"
+      class="header-search-input"
+      placeholder="Search players..."
+      bind:value={playerSearch}
+      oninput={(e) => onPlayerSearch(e.currentTarget.value)}
+      onfocus={() => showPlayerDropdown = true}
+      onblur={() => setTimeout(() => showPlayerDropdown = false, 150)}
+    />
+    {#if showPlayerDropdown && playerResults.length > 0}
+      <div class="header-search-dropdown">
+        {#each playerResults as p}
+          <div class="header-search-option" onmousedown={() => selectPlayer(p.player_name)}>
+            {p.player_name}
+          </div>
+        {/each}
+      </div>
+    {/if}
+  </div>
 </div>
 
 <!-- Period Toggle -->
@@ -415,6 +460,55 @@
     font-size: 1.75rem;
     margin-bottom: 0.25rem;
     color: var(--accent);
+    display: inline;
+  }
+
+  .header-search {
+    display: inline-block;
+    position: relative;
+    margin-left: 12px;
+    vertical-align: middle;
+  }
+
+  .header-search-input {
+    padding: 4px 10px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    width: 180px;
+  }
+
+  .header-search-input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .header-search-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-top: 2px;
+    z-index: 50;
+    max-height: 250px;
+    overflow-y: auto;
+  }
+
+  .header-search-option {
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+  }
+
+  .header-search-option:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
   }
 
   /* Period Toggle */
