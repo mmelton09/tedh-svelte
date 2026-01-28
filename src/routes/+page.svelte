@@ -139,7 +139,7 @@
             min_size: data.minSize.toString(),
             start: data.periodStart,
             end: data.periodEnd,
-            converted_only: 'true'
+            ...(data.selectedTournament ? {} : { converted_only: 'true' })
           });
           const res = await fetch(`/api/commander-tournaments?${params}`);
           const result = await res.json();
@@ -762,20 +762,8 @@
   <span class="muted">({data.totalEntries?.toLocaleString() || 0} entries)</span>
 </div>
 
-<!-- Selected Tournament Banner -->
-{#if data.selectedTournament}
-<div class="selected-tournament-banner">
-  <span class="label">Showing data for:</span>
-  <a href="/tournaments/{data.selectedTournament.tid}" class="tournament-link">
-    {data.selectedTournament.tournament_name}
-  </a>
-  <span class="players">({data.selectedTournament.total_players} players)</span>
-  <button class="clear-tournament-btn" onclick={clearTournament}>✕ Clear</button>
-</div>
-{/if}
-
 <!-- Tournaments Bar: Live first, then completed -->
-{#if (data.liveTournaments?.length > 0 || data.recentTournaments?.length > 0) && !data.selectedTournament}
+{#if (data.liveTournaments?.length > 0 || data.recentTournaments?.length > 0)}
 {@const liveTids = new Set(data.liveTournaments?.map(t => t.tid) || [])}
 {@const completedTournaments = data.recentTournaments?.filter(t => !liveTids.has(t.tid)) || []}
 {@const slotsForCompleted = Math.max(0, 3 - (data.liveTournaments?.length || 0))}
@@ -791,30 +779,38 @@
     />
     {#if showTournamentDropdown}
       <div class="tournament-dropdown">
-        <div class="tournament-option" onclick={() => { showTournamentDropdown = false; tournamentSearch = ''; }}>
+        <div class="tournament-option" onclick={() => { clearTournament(); showTournamentDropdown = false; tournamentSearch = ''; }}>
           All Tournaments
         </div>
         {#each data.recentTournaments.filter(t => t.tournament_name.toLowerCase().includes(tournamentSearch.toLowerCase())) as t}
-          <div class="tournament-option" onclick={() => { selectTournament(t.tid); showTournamentDropdown = false; }}>
+          <div class="tournament-option" class:selected-option={data.selectedTournament?.tid === t.tid} onclick={() => { selectTournament(t.tid); showTournamentDropdown = false; }}>
             {t.tournament_name} <span class="size">({t.total_players} players)</span>
           </div>
         {/each}
       </div>
     {/if}
   </div>
-  {#each data.liveTournaments || [] as t}
-    <div class="tournament-item live" role="button" tabindex="0" onclick={() => selectTournament(t.tid)} onkeydown={(e) => e.key === 'Enter' && selectTournament(t.tid)}>
-      <span class="live-badge">LIVE</span>
-      <a href="/tournaments/{t.tid}" class="name" onclick={(e) => e.stopPropagation()}>{t.tournament_name}</a>
-      <span class="size">{t.total_players} players</span>
+  {#if data.selectedTournament}
+    <div class="tournament-item selected">
+      <a href="/tournaments/{data.selectedTournament.tid}" class="name" onclick={(e) => e.stopPropagation()}>{data.selectedTournament.tournament_name}</a>
+      <span class="size">{data.selectedTournament.total_players} players</span>
+      <button class="clear-tournament-btn" onclick={(e) => { e.stopPropagation(); clearTournament(); }}>✕</button>
     </div>
-  {/each}
-  {#each completedTournaments.slice(0, slotsForCompleted) as t}
-    <div class="tournament-item" role="button" tabindex="0" onclick={() => selectTournament(t.tid)} onkeydown={(e) => e.key === 'Enter' && selectTournament(t.tid)}>
-      <span class="size">{t.total_players}</span>
-      <a href="/tournaments/{t.tid}" class="name" onclick={(e) => e.stopPropagation()}>{t.tournament_name}</a>
-    </div>
-  {/each}
+  {:else}
+    {#each data.liveTournaments || [] as t}
+      <div class="tournament-item live" role="button" tabindex="0" onclick={() => selectTournament(t.tid)} onkeydown={(e) => e.key === 'Enter' && selectTournament(t.tid)}>
+        <span class="live-badge">LIVE</span>
+        <a href="/tournaments/{t.tid}" class="name" onclick={(e) => e.stopPropagation()}>{t.tournament_name}</a>
+        <span class="size">{t.total_players} players</span>
+      </div>
+    {/each}
+    {#each completedTournaments.slice(0, slotsForCompleted) as t}
+      <div class="tournament-item" role="button" tabindex="0" onclick={() => selectTournament(t.tid)} onkeydown={(e) => e.key === 'Enter' && selectTournament(t.tid)}>
+        <span class="size">{t.total_players}</span>
+        <a href="/tournaments/{t.tid}" class="name" onclick={(e) => e.stopPropagation()}>{t.tournament_name}</a>
+      </div>
+    {/each}
+  {/if}
 </div>
 {/if}
 
@@ -1215,22 +1211,25 @@
               {#if loadingTournaments.has(cmd.commander_pair)}
                 <div class="loading-tournaments">Loading tournaments...</div>
               {:else if tournamentData[cmd.commander_pair]?.length > 0}
-                {@const topPerformances = tournamentData[cmd.commander_pair]
+                {@const allEntries = tournamentData[cmd.commander_pair]
                   .flatMap(t => t.entries.map((e: any) => ({ ...e, tournament_name: t.tournament_name, tid: t.tid, start_date: t.start_date, total_players: t.total_players })))
-                  .sort((a: any, b: any) => a.standing - b.standing)
-                  .slice(0, 3)}
+                  .sort((a: any, b: any) => a.standing - b.standing)}
+                {@const isSingleTournament = !!data.selectedTournament}
+                {@const displayEntries = isSingleTournament ? allEntries : allEntries.slice(0, 3)}
                 <div class="tournament-details">
                   <table class="tournaments-table">
                     <thead>
                       <tr>
                         <th>#</th>
                         <th>Player</th>
-                        <th>Tournament</th>
+                        {#if !isSingleTournament}
+                          <th>Tournament</th>
+                        {/if}
                         <th>Record</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {#each topPerformances as perf}
+                      {#each displayEntries as perf}
                         <tr class="entry-row">
                           <td class="metric" class:gold={perf.standing === 1} class:silver={perf.standing === 2} class:bronze={perf.standing === 3}>
                             #{perf.standing}
@@ -1238,10 +1237,12 @@
                           <td>
                             <a href="/players/{perf.player_id}" onclick={(e) => e.stopPropagation()}>{perf.player_name}</a>
                           </td>
-                          <td>
-                            <a href="/tournaments/{perf.tid}" onclick={(e) => e.stopPropagation()}>{perf.tournament_name}</a>
-                            <span class="tournament-meta">{formatTournamentDate(perf.start_date)} · {perf.total_players}p</span>
-                          </td>
+                          {#if !isSingleTournament}
+                            <td>
+                              <a href="/tournaments/{perf.tid}" onclick={(e) => e.stopPropagation()}>{perf.tournament_name}</a>
+                              <span class="tournament-meta">{formatTournamentDate(perf.start_date)} · {perf.total_players}p</span>
+                            </td>
+                          {/if}
                           <td class="metric">{perf.wins}-{perf.losses}-{perf.draws}</td>
                         </tr>
                       {/each}
@@ -1561,6 +1562,30 @@
     color: var(--accent);
   }
 
+  .tournament-item.selected {
+    background: rgba(76, 175, 80, 0.15);
+    border: 1px solid var(--accent);
+  }
+
+  .clear-tournament-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0 4px;
+    font-size: 0.85em;
+    line-height: 1;
+  }
+
+  .clear-tournament-btn:hover {
+    color: var(--text-primary);
+  }
+
+  .selected-option {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
   @keyframes pulse-border {
     0%, 100% { border-color: #ef4444; box-shadow: 0 0 5px rgba(239, 68, 68, 0.3); }
     50% { border-color: #f87171; box-shadow: 0 0 10px rgba(239, 68, 68, 0.5); }
@@ -1620,55 +1645,6 @@
     font-size: 0.85em;
   }
 
-
-  /* Selected Tournament Banner */
-  .selected-tournament-banner {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    margin: 12px 0;
-    padding: 12px 20px;
-    background: rgba(76, 175, 80, 0.15);
-    border: 1px solid var(--accent);
-    border-radius: 8px;
-  }
-
-  .selected-tournament-banner .label {
-    color: var(--text-muted);
-  }
-
-  .selected-tournament-banner .tournament-link {
-    color: var(--accent);
-    font-weight: 600;
-    text-decoration: none;
-  }
-
-  .selected-tournament-banner .tournament-link:hover {
-    text-decoration: underline;
-  }
-
-  .selected-tournament-banner .players {
-    color: var(--text-muted);
-    font-size: 0.9em;
-  }
-
-  .clear-tournament-btn {
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border);
-    color: var(--text-primary);
-    padding: 4px 10px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.85em;
-    margin-left: 10px;
-  }
-
-  .clear-tournament-btn:hover {
-    background: #444;
-    border-color: var(--negative);
-    color: var(--negative);
-  }
 
   /* Filters */
   .filters {
