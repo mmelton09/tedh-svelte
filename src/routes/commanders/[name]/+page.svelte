@@ -94,13 +94,79 @@
       });
     }
 
-    // Add baseline at 0% (expected) when showing any vs-expected metrics
-    if (showConv || showWin || showTop4 || showChamp) {
+    // Add dotted average lines for each visible metric
+    if (showEntries) {
+      const values = trendData.map((m: any) => m.entries).filter((v: number) => v > 0);
+      const avg = values.length > 0 ? values.reduce((a: number, b: number) => a + b, 0) / values.length : 0;
       datasets.push({
         type: 'line',
-        label: 'Expected',
-        data: trendData.map(() => 0),
-        borderColor: 'rgba(156, 163, 175, 0.6)',
+        label: 'Avg Entries',
+        data: trendData.map(() => avg),
+        borderColor: 'rgba(99, 102, 241, 0.6)',
+        borderWidth: 1,
+        borderDash: [5, 5],
+        pointRadius: 0,
+        yAxisID: 'y',
+        tension: 0
+      });
+    }
+
+    if (showConv) {
+      const values = trendData.map((m: any) => m.convVsExpected);
+      const avg = values.reduce((a: number, b: number) => a + b, 0) / values.length;
+      datasets.push({
+        type: 'line',
+        label: 'Avg Conv',
+        data: trendData.map(() => avg),
+        borderColor: 'rgba(34, 197, 94, 0.6)',
+        borderWidth: 1,
+        borderDash: [5, 5],
+        pointRadius: 0,
+        yAxisID: 'y1',
+        tension: 0
+      });
+    }
+
+    if (showWin) {
+      const values = trendData.map((m: any) => m.winVsExpected);
+      const avg = values.reduce((a: number, b: number) => a + b, 0) / values.length;
+      datasets.push({
+        type: 'line',
+        label: 'Avg Win',
+        data: trendData.map(() => avg),
+        borderColor: 'rgba(251, 191, 36, 0.6)',
+        borderWidth: 1,
+        borderDash: [5, 5],
+        pointRadius: 0,
+        yAxisID: 'y1',
+        tension: 0
+      });
+    }
+
+    if (showTop4) {
+      const values = trendData.map((m: any) => m.top4VsExpected);
+      const avg = values.reduce((a: number, b: number) => a + b, 0) / values.length;
+      datasets.push({
+        type: 'line',
+        label: 'Avg Top4',
+        data: trendData.map(() => avg),
+        borderColor: 'rgba(168, 85, 247, 0.6)',
+        borderWidth: 1,
+        borderDash: [5, 5],
+        pointRadius: 0,
+        yAxisID: 'y1',
+        tension: 0
+      });
+    }
+
+    if (showChamp) {
+      const values = trendData.map((m: any) => m.champVsExpected);
+      const avg = values.reduce((a: number, b: number) => a + b, 0) / values.length;
+      datasets.push({
+        type: 'line',
+        label: 'Avg Champ',
+        data: trendData.map(() => avg),
+        borderColor: 'rgba(236, 72, 153, 0.6)',
         borderWidth: 1,
         borderDash: [5, 5],
         pointRadius: 0,
@@ -154,7 +220,7 @@
                 return '';
               },
               filter: function(item) {
-                return item.dataset.label !== 'Expected';
+                return !item.dataset.label?.startsWith('Avg');
               },
               label: function(context) {
                 if (context.dataset.label === 'Entries') {

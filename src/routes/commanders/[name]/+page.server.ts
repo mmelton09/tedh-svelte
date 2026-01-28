@@ -334,18 +334,20 @@ function getStartDateForPeriod(period: string): Date {
 
 // Get weekly trends from precalculated table
 async function getWeeklyTrends(commanderName: string, minSize: number, dataType: string, period: string) {
-  // Fetch precalculated weekly data
+  const now = new Date();
+  const startDate = getStartDateForPeriod(period);
+  const startDateStr = startDate.toISOString().split('T')[0];
+
+  // Fetch precalculated weekly data filtered by date
   const { data: weeklyData } = await supabase
     .from('commander_trends')
     .select('*')
     .eq('commander_pair', commanderName)
     .eq('min_size', minSize)
     .eq('data_type', dataType)
+    .gte('week_start', startDateStr)
     .order('week_start', { ascending: true })
     .limit(500);
-
-  const now = new Date();
-  const startDate = getStartDateForPeriod(period);
 
   function getWeekMonday(date: Date): Date {
     const d = new Date(date);
@@ -459,17 +461,19 @@ async function getWeeklyTrends(commanderName: string, minSize: number, dataType:
 }
 
 async function getMonthlyTrends(commanderName: string, minSize: number, dataType: string, period: string) {
+  const now = new Date();
+  const startDate = getStartDateForPeriod(period);
+  const startDateStr = startDate.toISOString().split('T')[0];
+
   const { data: weeklyData } = await supabase
     .from('commander_trends')
     .select('*')
     .eq('commander_pair', commanderName)
     .eq('min_size', minSize)
     .eq('data_type', dataType)
+    .gte('week_start', startDateStr)
     .order('week_start', { ascending: true })
     .limit(500);
-
-  const now = new Date();
-  const startDate = getStartDateForPeriod(period);
 
   const allMonths: Date[] = [];
   let currentMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
