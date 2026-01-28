@@ -16,6 +16,9 @@
   let showWin = $state(false);
   let showTop4 = $state(false);
   let showChamp = $state(false);
+  let useWeeklyView = $state(false);
+
+  let trendData = $derived(useWeeklyView ? data.weeklyTrends : data.monthlyTrends);
 
   function buildDatasets() {
     const datasets: any[] = [];
@@ -24,7 +27,7 @@
       datasets.push({
         type: 'line',
         label: 'Entries',
-        data: data.monthlyTrends.map((m: any) => m.entries),
+        data: trendData.map((m: any) => m.entries),
         borderColor: 'rgba(99, 102, 241, 1)',
         backgroundColor: 'rgba(99, 102, 241, 0.2)',
         borderWidth: 2,
@@ -39,7 +42,7 @@
       datasets.push({
         type: 'line',
         label: '±Conv%',
-        data: data.monthlyTrends.map((m: any) => m.convVsExpected),
+        data: trendData.map((m: any) => m.convVsExpected),
         borderColor: 'rgba(34, 197, 94, 1)',
         backgroundColor: 'rgba(34, 197, 94, 0.2)',
         borderWidth: 2,
@@ -53,7 +56,7 @@
       datasets.push({
         type: 'line',
         label: '±Win%',
-        data: data.monthlyTrends.map((m: any) => m.winVsExpected),
+        data: trendData.map((m: any) => m.winVsExpected),
         borderColor: 'rgba(251, 191, 36, 1)',
         backgroundColor: 'rgba(251, 191, 36, 0.2)',
         borderWidth: 2,
@@ -67,7 +70,7 @@
       datasets.push({
         type: 'line',
         label: '±Top4%',
-        data: data.monthlyTrends.map((m: any) => m.top4VsExpected),
+        data: trendData.map((m: any) => m.top4VsExpected),
         borderColor: 'rgba(168, 85, 247, 1)',
         backgroundColor: 'rgba(168, 85, 247, 0.2)',
         borderWidth: 2,
@@ -81,7 +84,7 @@
       datasets.push({
         type: 'line',
         label: '±Champ%',
-        data: data.monthlyTrends.map((m: any) => m.champVsExpected),
+        data: trendData.map((m: any) => m.champVsExpected),
         borderColor: 'rgba(236, 72, 153, 1)',
         backgroundColor: 'rgba(236, 72, 153, 0.2)',
         borderWidth: 2,
@@ -102,7 +105,7 @@
   }
 
   function initChart() {
-    if (!chartCanvas || !data.monthlyTrends?.length) return;
+    if (!chartCanvas || !trendData?.length) return;
 
     const ctx = chartCanvas.getContext('2d');
     if (!ctx) return;
@@ -112,7 +115,7 @@
     chart = new Chart(ctx, {
       type: 'line',
       data: {
-        labels: data.monthlyTrends.map((m: any) => m.label),
+        labels: trendData.map((m: any) => m.label),
         datasets: buildDatasets()
       },
       options: {
@@ -130,8 +133,8 @@
             callbacks: {
               title: function(contexts) {
                 const idx = contexts[0]?.dataIndex;
-                if (idx !== undefined && data.monthlyTrends[idx]) {
-                  return data.monthlyTrends[idx].fullLabel;
+                if (idx !== undefined && trendData[idx]) {
+                  return trendData[idx].fullLabel;
                 }
                 return '';
               },
@@ -194,9 +197,14 @@
 
   // Reactive update when toggles change
   $effect(() => {
-    // Track all toggle states
     showEntries; showConv; showWin; showTop4; showChamp;
     updateChart();
+  });
+
+  // Reinit chart when data source changes
+  $effect(() => {
+    useWeeklyView;
+    initChart();
   });
 
   // Accordion state - track which pilot rows are expanded
@@ -487,8 +495,12 @@
     {/if}
   </div>
   <div class="header-right">
-    {#if data.monthlyTrends && data.monthlyTrends.length > 0}
+    {#if trendData && trendData.length > 0}
       <div class="chart-controls">
+        <div class="granularity-toggle">
+          <button class:active={!useWeeklyView} onclick={() => useWeeklyView = false}>Mo</button>
+          <button class:active={useWeeklyView} onclick={() => useWeeklyView = true}>Wk</button>
+        </div>
         <label class="chart-toggle">
           <input type="checkbox" bind:checked={showEntries} />
           <span class="toggle-label" style="--color: rgba(99, 102, 241, 1)">Entries</span>
@@ -1244,6 +1256,35 @@
     color: var(--color);
     font-size: 0.8rem;
     font-weight: 500;
+  }
+
+  .granularity-toggle {
+    display: flex;
+    gap: 2px;
+    margin-right: 0.5rem;
+  }
+
+  .granularity-toggle button {
+    padding: 0.2rem 0.5rem;
+    font-size: 0.75rem;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+
+  .granularity-toggle button:first-child {
+    border-radius: 4px 0 0 4px;
+  }
+
+  .granularity-toggle button:last-child {
+    border-radius: 0 4px 4px 0;
+  }
+
+  .granularity-toggle button.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
   }
 
   @media (max-width: 768px) {

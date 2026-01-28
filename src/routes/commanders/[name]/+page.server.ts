@@ -267,8 +267,11 @@ export const load: PageServerLoad = async ({ params, url }) => {
   // Wait for parallel operations
   const [cardImages, colorIdentity] = await Promise.all([cardImagesPromise, colorIdentityPromise]);
 
-  // Get weekly trends from precalc table
-  const monthlyTrends = await getWeeklyTrends(commanderName, precalcMinSize, dataType);
+  // Get trends from precalc table
+  const [weeklyTrends, monthlyTrends] = await Promise.all([
+    getWeeklyTrends(commanderName, precalcMinSize, dataType),
+    getMonthlyTrends(commanderName, precalcMinSize, dataType)
+  ]);
 
   return {
     commanderName,
@@ -291,6 +294,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
       champ_rate: 0
     },
     pilots,
+    weeklyTrends,
     monthlyTrends,
     periodStart: dateRange.start,
     periodEnd: dateRange.end,
@@ -424,4 +428,92 @@ async function getWeeklyTrends(commanderName: string, minSize: number, dataType:
       champVsExpected: (avgChampRate - 0.25) * 100
     };
   });
+}
+
+async function getMonthlyTrends(commanderName: string, minSize: number, dataType: string) {
+  const { data: weeklyData } = await supabase
+    .from('commander_trends')
+    .select('*')
+    .eq('commander_pair', commanderName)
+    .eq('min_size', minSize)
+    .eq('data_type', dataType)
+    .order('week_start', { ascending: true })
+    .limit(200);
+
+  const now = new Date();
+  const twelveMonthsAgo = new Date(now);
+  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+
+  const allMonths: Date[] = [];
+  let currentMonth = new Date(twelveMonthsAgo.getFullYear(), twelveMonthsAgo.getMonth(), 1);
+  const endMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  while (currentMonth <= endMonth) {
+    allMonths.push(new Date(currentMonth));
+    currentMonth.setMonth(currentMonth.getMonth() + 1);
+  }
+
+  const monthlyAggregates: Record<string, { entries: number; conversions: number; top4s: number; championships: number; wins: number; losses: number; draws: number }> = {};
+
+  for (const row of weeklyData || []) {
+    const weekDate = new Date(row.week_start);
+    const monthKey = `${weekDate.getFullYear()}-${String(weekDate.getMonth() + 1).padStart(2, '0')}`;
+
+    if (!monthlyAggregates[monthKey]) {
+      monthlyAggregates[monthKey] = { entries: 0, conversions: 0, top4s: 0, championships: 0, wins: 0, losses: 0, draws: 0 };
+    }
+
+    monthlyAggregates[monthKey].entries += row.entries;
+    monthlyAggregates[monthKey].conversions += row.conversions;
+    monthlyAggregates[monthKey].top4s += row.top4s;
+    monthlyAggregates[monthKey].championships += row.championships;
+    monthlyAggregates[monthKey].wins += row.wins;
+    monthlyAggregates[monthKey].losses += row.losses;
+    monthlyAggregates[monthKey].draws += row.draws;
+  }
+
+  const monthlyStats = allMonths.map((monthStart) => {
+    const key = `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, '0')}`;
+    const agg = monthlyAggregates[key];
+    const label = monthStart.toLocaleDateString('en-US', { month: 'short' });
+    const fullLabel = monthStart.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+
+    if (agg) {
+      const totalGames = agg.wins + agg.losses + agg.draws;
+      const winRate = totalGames > 0 ? agg.wins / totalGames : 0;
+      const convRate = agg.entries > 0 ? agg.conversions / agg.entries : 0;
+      const top4Rate = agg.entries > 0 ? agg.top4s / agg.entries : 0;
+      const champRate = agg.entries > 0 ? agg.championships / agg.entries : 0;
+
+      return {
+        label,
+        fullLabel,
+        entries: agg.entries,
+        winRate,
+        winVsExpected: (winRate - 0.25) * 100,
+        convRate,
+        convVsExpected: (convRate - 0.25) * 100,
+        top4Rate,
+        top4VsExpected: (top4Rate - 0.25) * 100,
+        champRate,
+        champVsExpected: (champRate - 0.25) * 100
+      };
+    }
+
+    return {
+      label,
+      fullLabel,
+      entries: 0,
+      winRate: 0,
+      winVsExpected: -25,
+      convRate: 0,
+      convVsExpected: -25,
+      top4Rate: 0,
+      top4VsExpected: -25,
+      champRate: 0,
+      champVsExpected: -25
+    };
+  });
+
+  return monthlyStats;
 }
