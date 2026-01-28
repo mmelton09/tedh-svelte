@@ -261,9 +261,9 @@
       { value: 'last_week', label: 'Last Week' }
     ],
     months: [
-      { value: 'current_month', label: getCurrentMonthLabel() },
+      { value: 'prev_month_2', label: getPrevMonthLabel(2) },
       { value: 'prev_month', label: getPrevMonthLabel(1) },
-      { value: 'prev_month_2', label: getPrevMonthLabel(2) }
+      { value: 'current_month', label: getCurrentMonthLabel() }
     ],
     rolling: [
       { value: '1m', label: '30d' },
@@ -556,7 +556,7 @@
   <span class="period-separator">|</span>
   {/if}
   <span class="period-group">
-    {#each periodGroups.recent as p}
+    {#each periodGroups.months as p}
       <button
         class="period-btn"
         class:active={data.period === p.value}
@@ -566,7 +566,7 @@
   </span>
   <span class="period-separator">|</span>
   <span class="period-group">
-    {#each periodGroups.months as p}
+    {#each periodGroups.recent as p}
       <button
         class="period-btn"
         class:active={data.period === p.value}
