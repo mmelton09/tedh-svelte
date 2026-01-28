@@ -4,40 +4,16 @@ import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ url }) => {
   const commanderPair = url.searchParams.get('commander');
-  const period = url.searchParams.get('period') || '1y';
   const minSize = parseInt(url.searchParams.get('min_size') || '50') || 50;
+  const convertedOnly = url.searchParams.get('converted_only') === 'true';
 
   if (!commanderPair) {
     return json({ error: 'Commander parameter required' }, { status: 400 });
   }
 
-  // Calculate date range based on period
   const now = new Date();
-  const end = now.toISOString().split('T')[0];
-  let start: string;
-
-  switch (period) {
-    case '30d':
-      start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      break;
-    case '90d':
-      start = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      break;
-    case '6mo':
-      start = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      break;
-    case '1y':
-      start = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      break;
-    case 'post_ban':
-      start = '2024-09-23';
-      break;
-    case 'all':
-      start = '2020-01-01';
-      break;
-    default:
-      start = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-  }
+  const start = url.searchParams.get('start') || new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const end = url.searchParams.get('end') || now.toISOString().split('T')[0];
 
   // Get tournaments in date range
   const { data: tournaments } = await supabase
@@ -111,6 +87,8 @@ export const GET: RequestHandler = async ({ url }) => {
 
   for (const entry of matchingEntries) {
     if (tournamentMap[entry.tid]) {
+      const topCut = tournamentMap[entry.tid].top_cut || 0;
+      if (convertedOnly && (topCut === 0 || entry.standing > topCut)) continue;
       tournamentMap[entry.tid].entries.push({
         player_id: entry.player_id,
         player_name: (entry.players as any)?.player_name || 'Unknown',
@@ -122,11 +100,10 @@ export const GET: RequestHandler = async ({ url }) => {
     }
   }
 
-  // Convert to list, sorted by date, limited to 5 tournaments with entries
+  // Convert to list with entries, sorted by date
   const result = Object.values(tournamentMap)
     .filter((t: any) => t.entries.length > 0)
     .sort((a: any, b: any) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime())
-    .slice(0, 5)
     .map((t: any) => ({
       ...t,
       entries: t.entries.sort((a: any, b: any) => a.standing - b.standing)

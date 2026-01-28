@@ -136,8 +136,10 @@
         try {
           const params = new URLSearchParams({
             commander: commanderPair,
-            period: data.period,
-            min_size: data.minSize.toString()
+            min_size: data.minSize.toString(),
+            start: data.periodStart,
+            end: data.periodEnd,
+            converted_only: 'true'
           });
           const res = await fetch(`/api/commander-tournaments?${params}`);
           const result = await res.json();
@@ -171,10 +173,12 @@
   let lockSelection = $state(false);
   let lockedOrder = $state<string[]>([]);
 
-  // Keep date inputs in sync with server data
+  // Keep date inputs in sync with server data, clear cached tournaments on period change
   $effect(() => {
     dateStart = data.periodStart || '';
     dateEnd = data.periodEnd || '';
+    tournamentData = {};
+    expandedRows = new Set();
   });
 
   // Toggle lock and capture/clear order
@@ -1211,36 +1215,35 @@
               {#if loadingTournaments.has(cmd.commander_pair)}
                 <div class="loading-tournaments">Loading tournaments...</div>
               {:else if tournamentData[cmd.commander_pair]?.length > 0}
+                {@const topPerformances = tournamentData[cmd.commander_pair]
+                  .flatMap(t => t.entries.map((e: any) => ({ ...e, tournament_name: t.tournament_name, tid: t.tid, start_date: t.start_date, total_players: t.total_players })))
+                  .sort((a: any, b: any) => a.standing - b.standing)
+                  .slice(0, 3)}
                 <div class="tournament-details">
                   <table class="tournaments-table">
                     <thead>
                       <tr>
-                        <th>Date</th>
+                        <th>#</th>
+                        <th>Player</th>
                         <th>Tournament</th>
-                        <th>Size</th>
-                        <th>Players</th>
+                        <th>Record</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {#each [...tournamentData[cmd.commander_pair]].sort((a, b) => Math.min(...a.entries.map(e => e.standing)) - Math.min(...b.entries.map(e => e.standing))) as t}
-                        <tr class="tournament-header">
-                          <td>{formatTournamentDate(t.start_date)}</td>
-                          <td><a href="/tournaments/{t.tid}">{t.tournament_name}</a></td>
-                          <td class="metric">{t.total_players}</td>
-                          <td class="metric">{t.entries.length}</td>
+                      {#each topPerformances as perf}
+                        <tr class="entry-row">
+                          <td class="metric" class:gold={perf.standing === 1} class:silver={perf.standing === 2} class:bronze={perf.standing === 3}>
+                            #{perf.standing}
+                          </td>
+                          <td>
+                            <a href="/players/{perf.player_id}" onclick={(e) => e.stopPropagation()}>{perf.player_name}</a>
+                          </td>
+                          <td>
+                            <a href="/tournaments/{perf.tid}" onclick={(e) => e.stopPropagation()}>{perf.tournament_name}</a>
+                            <span class="tournament-meta">{formatTournamentDate(perf.start_date)} · {perf.total_players}p</span>
+                          </td>
+                          <td class="metric">{perf.wins}-{perf.losses}-{perf.draws}</td>
                         </tr>
-                        {#each [...t.entries].sort((a, b) => a.standing - b.standing) as entry}
-                          <tr class="entry-row" class:top-cut={t.top_cut && entry.standing <= t.top_cut}>
-                            <td></td>
-                            <td>
-                              <a href="/players/{entry.player_id}">{entry.player_name}</a>
-                            </td>
-                            <td class="metric">{entry.wins}-{entry.losses}-{entry.draws}</td>
-                            <td class="metric" class:gold={entry.standing === 1} class:silver={entry.standing === 2} class:bronze={entry.standing === 3}>
-                              #{entry.standing}
-                            </td>
-                          </tr>
-                        {/each}
                       {/each}
                     </tbody>
                   </table>
@@ -2251,18 +2254,14 @@
     border-bottom: 1px solid var(--border);
   }
 
-  .tournament-header td {
-    background: rgba(76, 175, 80, 0.1);
-    font-weight: 500;
-  }
-
   .entry-row td {
-    padding-left: 30px;
     color: var(--text-secondary);
   }
 
-  .entry-row.top-cut td {
-    color: var(--accent);
+  .tournament-meta {
+    display: block;
+    font-size: 0.8em;
+    color: var(--text-muted);
   }
 
   .entry-row td.gold {
