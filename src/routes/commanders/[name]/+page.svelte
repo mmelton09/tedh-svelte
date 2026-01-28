@@ -94,6 +94,21 @@
       });
     }
 
+    // Add baseline at 0% (expected) when showing any vs-expected metrics
+    if (showConv || showWin || showTop4 || showChamp) {
+      datasets.push({
+        type: 'line',
+        label: 'Expected',
+        data: trendData.map(() => 0),
+        borderColor: 'rgba(156, 163, 175, 0.6)',
+        borderWidth: 1,
+        borderDash: [5, 5],
+        pointRadius: 0,
+        yAxisID: 'y1',
+        tension: 0
+      });
+    }
+
     return datasets;
   }
 
@@ -137,6 +152,9 @@
                   return trendData[idx].fullLabel;
                 }
                 return '';
+              },
+              filter: function(item) {
+                return item.dataset.label !== 'Expected';
               },
               label: function(context) {
                 if (context.dataset.label === 'Entries') {
