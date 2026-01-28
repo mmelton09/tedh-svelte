@@ -1,7 +1,22 @@
 import { supabase } from '$lib/supabase';
 import type { PageServerLoad } from './$types';
+import { redirect } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ url }) => {
+  // If no params, redirect to most recent 100+ event
+  if (!url.searchParams.has('min_size')) {
+    const { data: recent } = await supabase
+      .from('tournaments')
+      .select('tid')
+      .gte('total_players', 100)
+      .order('start_date', { ascending: false })
+      .limit(1);
+
+    if (recent && recent.length > 0) {
+      throw redirect(307, `/tournaments/${recent[0].tid}`);
+    }
+  }
+
   const minSize = parseInt(url.searchParams.get('min_size') || '16');
   const page = parseInt(url.searchParams.get('page') || '1');
   const limit = 50;
