@@ -1,7 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { page } from '$app/stores';
-  import { onMount } from 'svelte';
 
   let { data } = $props();
 
@@ -104,14 +103,6 @@
       .slice(0, 8);
   });
 
-  // Clean preset param from URL after applying
-  onMount(() => {
-    if (preset) {
-      const params = new URLSearchParams($page.url.searchParams);
-      params.delete('preset');
-      goto(`?${params.toString()}`, { replaceState: true });
-    }
-  });
 
   // Mobile column group state
   let mobileColGroup = $state(1);
