@@ -269,8 +269,8 @@ export const load: PageServerLoad = async ({ params, url }) => {
 
   // Get trends from precalc table
   const [weeklyTrends, monthlyTrends] = await Promise.all([
-    getWeeklyTrends(commanderName, precalcMinSize, dataType),
-    getMonthlyTrends(commanderName, precalcMinSize, dataType)
+    getWeeklyTrends(commanderName, precalcMinSize, dataType, period),
+    getMonthlyTrends(commanderName, precalcMinSize, dataType, period)
   ]);
 
   return {
@@ -302,8 +302,38 @@ export const load: PageServerLoad = async ({ params, url }) => {
   };
 };
 
+function getStartDateForPeriod(period: string): Date {
+  const now = new Date();
+  switch (period) {
+    case '1m':
+    case '30d':
+      const oneMonth = new Date(now);
+      oneMonth.setDate(oneMonth.getDate() - 30);
+      return oneMonth;
+    case '3m':
+    case '90d':
+      const threeMonths = new Date(now);
+      threeMonths.setMonth(threeMonths.getMonth() - 3);
+      return threeMonths;
+    case '6m':
+    case '6mo':
+      const sixMonths = new Date(now);
+      sixMonths.setMonth(sixMonths.getMonth() - 6);
+      return sixMonths;
+    case 'post_ban':
+      return new Date('2024-09-23');
+    case 'all':
+      return new Date('2020-01-01');
+    case '1y':
+    default:
+      const oneYear = new Date(now);
+      oneYear.setFullYear(oneYear.getFullYear() - 1);
+      return oneYear;
+  }
+}
+
 // Get weekly trends from precalculated table
-async function getWeeklyTrends(commanderName: string, minSize: number, dataType: string) {
+async function getWeeklyTrends(commanderName: string, minSize: number, dataType: string, period: string) {
   // Fetch precalculated weekly data
   const { data: weeklyData } = await supabase
     .from('commander_trends')
@@ -312,12 +342,10 @@ async function getWeeklyTrends(commanderName: string, minSize: number, dataType:
     .eq('min_size', minSize)
     .eq('data_type', dataType)
     .order('week_start', { ascending: true })
-    .limit(100);
+    .limit(500);
 
-  // Generate all weeks for last 6 months (to fill gaps)
   const now = new Date();
-  const sixMonthsAgo = new Date(now);
-  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+  const startDate = getStartDateForPeriod(period);
 
   function getWeekMonday(date: Date): Date {
     const d = new Date(date);
@@ -329,7 +357,7 @@ async function getWeeklyTrends(commanderName: string, minSize: number, dataType:
   }
 
   const allWeeks: Date[] = [];
-  let currentWeek = getWeekMonday(sixMonthsAgo);
+  let currentWeek = getWeekMonday(startDate);
   const endWeek = getWeekMonday(now);
 
   while (currentWeek <= endWeek) {
@@ -430,7 +458,7 @@ async function getWeeklyTrends(commanderName: string, minSize: number, dataType:
   });
 }
 
-async function getMonthlyTrends(commanderName: string, minSize: number, dataType: string) {
+async function getMonthlyTrends(commanderName: string, minSize: number, dataType: string, period: string) {
   const { data: weeklyData } = await supabase
     .from('commander_trends')
     .select('*')
@@ -438,14 +466,13 @@ async function getMonthlyTrends(commanderName: string, minSize: number, dataType
     .eq('min_size', minSize)
     .eq('data_type', dataType)
     .order('week_start', { ascending: true })
-    .limit(200);
+    .limit(500);
 
   const now = new Date();
-  const sixMonthsAgo = new Date(now);
-  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+  const startDate = getStartDateForPeriod(period);
 
   const allMonths: Date[] = [];
-  let currentMonth = new Date(sixMonthsAgo.getFullYear(), sixMonthsAgo.getMonth(), 1);
+  let currentMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
   const endMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
   while (currentMonth <= endMonth) {
