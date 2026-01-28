@@ -441,11 +441,11 @@ async function getMonthlyTrends(commanderName: string, minSize: number, dataType
     .limit(200);
 
   const now = new Date();
-  const twelveMonthsAgo = new Date(now);
-  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+  const sixMonthsAgo = new Date(now);
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
   const allMonths: Date[] = [];
-  let currentMonth = new Date(twelveMonthsAgo.getFullYear(), twelveMonthsAgo.getMonth(), 1);
+  let currentMonth = new Date(sixMonthsAgo.getFullYear(), sixMonthsAgo.getMonth(), 1);
   const endMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
   while (currentMonth <= endMonth) {
