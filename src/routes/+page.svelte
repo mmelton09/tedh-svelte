@@ -287,6 +287,11 @@
     return d.toLocaleDateString('en-US', { month: 'short' });
   }
 
+  function isWeekend(): boolean {
+    const day = new Date().getDay();
+    return day === 0 || day === 5 || day === 6; // Sun, Fri, Sat
+  }
+
   // Handle server-side filter changes (period, min_size)
   function updatePeriod(newPeriod: string) {
     const params = new URLSearchParams($page.url.searchParams);
@@ -515,6 +520,7 @@
 
 <!-- Time Period Toggle -->
 <div class="period-toggle">
+  {#if isWeekend()}
   <span class="period-group live-group">
     {#each periodGroups.live as p}
       <button
@@ -525,6 +531,7 @@
     {/each}
   </span>
   <span class="period-separator">|</span>
+  {/if}
   <span class="period-group">
     {#each periodGroups.recent as p}
       <button
