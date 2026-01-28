@@ -19,7 +19,7 @@
   const navLinks = [
     { href: '/', label: 'Meta' },
     { href: '/leaderboard', label: 'Leaderboard' },
-    { href: '/?preset=commanders&period=1m', label: 'Commanders', preset: 'commanders' },
+    { href: '/commanders', label: 'Commanders' },
     { href: '/players', label: 'Players' },
     { href: '/tournaments', label: 'Tournaments' }
   ];
@@ -63,11 +63,7 @@
         <a
           href={link.href}
           class="nav-link"
-          class:active={link.preset
-            ? $page.url.searchParams.get('preset') === link.preset
-            : link.href === '/'
-              ? $page.url.pathname === '/' && !$page.url.searchParams.has('preset')
-              : $page.url.pathname.startsWith(link.href)}
+          class:active={link.href === '/' ? $page.url.pathname === '/' : $page.url.pathname.startsWith(link.href)}
         >
           {link.label}
         </a>
