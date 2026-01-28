@@ -34,7 +34,7 @@
   let benchmarkSearch = $state('');
   let benchmarkShowDropdown = $state(false);
   let benchmarkHide = $state(false); // false = grey out, true = filter out
-  let benchmarkCols = $state<Set<string>>(new Set(['swiss5', 'conv_vs_expected', 'top4_vs_expected', 'champ_vs_expected']));
+  let benchmarkCols = $state<Set<string>>(new Set(['conv_vs_expected', 'top4_vs_expected', 'champ_vs_expected']));
 
   function toggleBenchmarkCol(col: string) {
     const next = new Set(benchmarkCols);
@@ -479,7 +479,7 @@
     benchmarkCommander = null;
     benchmarkSearch = '';
     benchmarkHide = false;
-    benchmarkCols = new Set(['swiss5', 'conv_vs_expected', 'top4_vs_expected', 'champ_vs_expected']);
+    benchmarkCols = new Set(['conv_vs_expected', 'top4_vs_expected', 'champ_vs_expected']);
   }
 
   function selectTournament(tid: string) {
