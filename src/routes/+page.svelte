@@ -34,7 +34,7 @@
   let benchmarkSearch = $state('');
   let benchmarkShowDropdown = $state(false);
   let benchmarkHide = $state(false); // false = grey out, true = filter out
-  let benchmarkCols = $state<Set<string>>(new Set(['win_rate', 'swiss5', 'conversion_rate', 'top4_rate', 'champ_rate']));
+  let benchmarkCols = $state<Set<string>>(new Set(['win_rate', 'swiss5', 'conv_vs_expected', 'top4_vs_expected', 'champ_vs_expected']));
 
   function toggleBenchmarkCol(col: string) {
     const next = new Set(benchmarkCols);
@@ -479,7 +479,7 @@
     benchmarkCommander = null;
     benchmarkSearch = '';
     benchmarkHide = false;
-    benchmarkCols = new Set(['win_rate', 'swiss5', 'conversion_rate', 'top4_rate', 'champ_rate']);
+    benchmarkCols = new Set(['win_rate', 'swiss5', 'conv_vs_expected', 'top4_vs_expected', 'champ_vs_expected']);
   }
 
   function selectTournament(tid: string) {
@@ -984,11 +984,11 @@
         <td class="benchmark-check col-g2"><input type="checkbox" checked={benchmarkCols.has('win_rate')} onchange={() => toggleBenchmarkCol('win_rate')} /></td>
         <td class="benchmark-check col-g2"><input type="checkbox" checked={benchmarkCols.has('swiss5')} onchange={() => toggleBenchmarkCol('swiss5')} /></td>
         <td class="benchmark-check col-g3"><input type="checkbox" checked={benchmarkCols.has('conversions')} onchange={() => toggleBenchmarkCol('conversions')} /></td>
-        <td class="benchmark-check col-g3"><input type="checkbox" checked={benchmarkCols.has('conversion_rate')} onchange={() => toggleBenchmarkCol('conversion_rate')} /></td>
+        <td class="benchmark-check col-g3"><input type="checkbox" checked={benchmarkCols.has('conv_vs_expected')} onchange={() => toggleBenchmarkCol('conv_vs_expected')} /></td>
         <td class="benchmark-check col-g4"><input type="checkbox" checked={benchmarkCols.has('top4s')} onchange={() => toggleBenchmarkCol('top4s')} /></td>
-        <td class="benchmark-check col-g4"><input type="checkbox" checked={benchmarkCols.has('top4_rate')} onchange={() => toggleBenchmarkCol('top4_rate')} /></td>
+        <td class="benchmark-check col-g4"><input type="checkbox" checked={benchmarkCols.has('top4_vs_expected')} onchange={() => toggleBenchmarkCol('top4_vs_expected')} /></td>
         <td class="benchmark-check col-g5"><input type="checkbox" checked={benchmarkCols.has('championships')} onchange={() => toggleBenchmarkCol('championships')} /></td>
-        <td class="benchmark-check col-g5"><input type="checkbox" checked={benchmarkCols.has('champ_rate')} onchange={() => toggleBenchmarkCol('champ_rate')} /></td>
+        <td class="benchmark-check col-g5"><input type="checkbox" checked={benchmarkCols.has('champ_vs_expected')} onchange={() => toggleBenchmarkCol('champ_vs_expected')} /></td>
       </tr>
       {/if}
       <tr>
