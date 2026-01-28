@@ -34,7 +34,7 @@
   let benchmarkSearch = $state('');
   let benchmarkShowDropdown = $state(false);
   let benchmarkHide = $state(false); // false = grey out, true = filter out
-  let benchmarkCols = $state<Set<string>>(new Set(['conversion_rate', 'top4_rate', 'champ_rate']));
+  let benchmarkCols = $state<Set<string>>(new Set(['win_rate', 'swiss5', 'conversion_rate', 'top4_rate', 'champ_rate']));
 
   function toggleBenchmarkCol(col: string) {
     const next = new Set(benchmarkCols);
@@ -48,12 +48,13 @@
       const cmd = data.commanders.find((c: any) => c.commander_pair === benchmarkCommander);
       if (cmd) return cmd;
     }
-    // Default: >0 ±EV means rates > 25%, vs_expected > 0
+    // Default: rates > 25%, swiss5 > 1.25
     return {
       entries: 0,
-      meta_pct: 0,
+      total_wins: 0,
+      total_losses: 0,
+      total_draws: 0,
       win_rate: 0.25,
-      swiss5: 1.25,
       conversions: 0,
       conversion_rate: 0.25,
       conv_vs_expected: 0,
@@ -66,16 +67,25 @@
     };
   });
 
+  function getCmdStat(cmd: any, col: string): number {
+    if (col === 'meta_pct') {
+      return cmd.entries / (filteredTotalEntries || 1);
+    }
+    if (col === 'swiss5') {
+      const totalGames = (cmd.total_wins || 0) + (cmd.total_losses || 0) + (cmd.total_draws || 0);
+      const winRate = cmd.win_rate || 0;
+      const drawRate = totalGames > 0 ? (cmd.total_draws || 0) / totalGames : 0;
+      return (winRate * 5) + (drawRate * 1);
+    }
+    return (cmd as any)[col] ?? 0;
+  }
+
   function passesBenchmark(cmd: any): boolean {
-    if (!benchmarkMode) return true;
+    if (!benchmarkMode || benchmarkCols.size === 0) return true;
     const bv = benchmarkValues();
     for (const col of benchmarkCols) {
-      const cmdVal = col === 'meta_pct'
-        ? cmd.entries / (filteredTotalEntries || 1)
-        : (cmd as any)[col] ?? 0;
-      const benchVal = col === 'meta_pct'
-        ? (bv as any).entries / (filteredTotalEntries || 1)
-        : (bv as any)[col] ?? 0;
+      const cmdVal = getCmdStat(cmd, col);
+      const benchVal = getCmdStat(bv, col);
       if (cmdVal < benchVal) return false;
     }
     return true;
@@ -469,7 +479,7 @@
     benchmarkCommander = null;
     benchmarkSearch = '';
     benchmarkHide = false;
-    benchmarkCols = new Set(['conversion_rate', 'top4_rate', 'champ_rate']);
+    benchmarkCols = new Set(['win_rate', 'swiss5', 'conversion_rate', 'top4_rate', 'champ_rate']);
   }
 
   function selectTournament(tid: string) {
