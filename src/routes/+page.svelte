@@ -640,7 +640,10 @@
     <div class="guide-item"><strong>Δ Delta</strong> <span>Change from previous equivalent period (e.g. last 30d vs prior 30d).</span></div>
     <div class="guide-item"><strong>🏅 Medals</strong> <span>Shows top 3 for each column. Conv/Top4/🏆 medals based on ±Exp.</span></div>
     <div class="guide-item"><strong>↕</strong> <span>Sort by delta (appears when Δ is active).</span></div>
-    <div class="guide-item"><strong>📊 Benchmark</strong> <span>Filter commanders by stats. Default: >0 ±EV. Check columns to compare, search to benchmark vs a specific commander. Grey/Hide toggle controls display.</span></div>
+    <div class="guide-item guide-item-wide">
+      <strong>📊 Benchmark</strong>
+      <span>Filter commanders by performance. Default: >0 ±EV (above expected). Check columns to benchmark against. Search to compare vs a specific commander. Grey dims non-qualifying rows; Hide removes them.</span>
+    </div>
   </div>
 </div>
 {/if}
@@ -1356,6 +1359,10 @@
 
   .guide-item span {
     color: var(--text-muted);
+  }
+
+  .guide-item-wide {
+    grid-column: 1 / -1;
   }
 
   /* Period Toggle */
