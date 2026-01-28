@@ -358,8 +358,17 @@ async function getWeeklyTrends(commanderName: string, minSize: number, dataType:
     return d;
   }
 
+  // Find the actual data range (don't generate empty weeks before data exists)
+  let effectiveStartDate = startDate;
+  if (weeklyData && weeklyData.length > 0) {
+    const firstDataDate = new Date(weeklyData[0].week_start);
+    if (firstDataDate > startDate) {
+      effectiveStartDate = firstDataDate;
+    }
+  }
+
   const allWeeks: Date[] = [];
-  let currentWeek = getWeekMonday(startDate);
+  let currentWeek = getWeekMonday(effectiveStartDate);
   const endWeek = getWeekMonday(now);
 
   while (currentWeek <= endWeek) {
@@ -475,8 +484,17 @@ async function getMonthlyTrends(commanderName: string, minSize: number, dataType
     .order('week_start', { ascending: true })
     .limit(500);
 
+  // Find the actual data range (don't generate empty months before data exists)
+  let effectiveStartDate = startDate;
+  if (weeklyData && weeklyData.length > 0) {
+    const firstDataDate = new Date(weeklyData[0].week_start);
+    if (firstDataDate > startDate) {
+      effectiveStartDate = firstDataDate;
+    }
+  }
+
   const allMonths: Date[] = [];
-  let currentMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+  let currentMonth = new Date(effectiveStartDate.getFullYear(), effectiveStartDate.getMonth(), 1);
   const endMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
   while (currentMonth <= endMonth) {
