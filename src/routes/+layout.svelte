@@ -18,7 +18,10 @@
 
   const navLinks = [
     { href: '/', label: 'Meta' },
-    { href: '/leaderboard', label: 'Leaderboard' }
+    { href: '/leaderboard', label: 'Leaderboard' },
+    { href: '/commanders', label: 'Commanders' },
+    { href: '/players', label: 'Players' },
+    { href: '/tournaments', label: 'Tournaments' }
   ];
 
   // Ranked vs All data toggle (default: all)
@@ -60,7 +63,7 @@
         <a
           href={link.href}
           class="nav-link"
-          class:active={$page.url.pathname === link.href}
+          class:active={link.href === '/' ? $page.url.pathname === '/' : $page.url.pathname.startsWith(link.href)}
         >
           {link.label}
         </a>
