@@ -31,6 +31,63 @@
   // Benchmark mode
   let benchmarkMode = $state(false);
   let benchmarkCommander = $state<string | null>(null);
+  let benchmarkSearch = $state('');
+  let benchmarkShowDropdown = $state(false);
+  let benchmarkHide = $state(false); // false = grey out, true = filter out
+  let benchmarkCols = $state<Set<string>>(new Set(['conversion_rate', 'top4_rate', 'champ_rate']));
+
+  function toggleBenchmarkCol(col: string) {
+    const next = new Set(benchmarkCols);
+    if (next.has(col)) next.delete(col);
+    else next.add(col);
+    benchmarkCols = next;
+  }
+
+  let benchmarkValues = $derived(() => {
+    if (benchmarkCommander) {
+      const cmd = data.commanders.find((c: any) => c.commander_pair === benchmarkCommander);
+      if (cmd) return cmd;
+    }
+    // Default: >0 ±EV means rates > 25%, vs_expected > 0
+    return {
+      entries: 0,
+      meta_pct: 0,
+      win_rate: 0.25,
+      swiss5: 1.25,
+      conversions: 0,
+      conversion_rate: 0.25,
+      conv_vs_expected: 0,
+      top4s: 0,
+      top4_rate: 0.25,
+      top4_vs_expected: 0,
+      championships: 0,
+      champ_rate: 0.25,
+      champ_vs_expected: 0
+    };
+  });
+
+  function passesBenchmark(cmd: any): boolean {
+    if (!benchmarkMode) return true;
+    const bv = benchmarkValues();
+    for (const col of benchmarkCols) {
+      const cmdVal = col === 'meta_pct'
+        ? cmd.entries / (filteredTotalEntries || 1)
+        : (cmd as any)[col] ?? 0;
+      const benchVal = col === 'meta_pct'
+        ? (bv as any).entries / (filteredTotalEntries || 1)
+        : (bv as any)[col] ?? 0;
+      if (cmdVal < benchVal) return false;
+    }
+    return true;
+  }
+
+  let benchmarkSearchResults = $derived(() => {
+    if (!benchmarkSearch.trim()) return [];
+    const search = benchmarkSearch.toLowerCase().trim();
+    return data.commanders
+      .filter((c: any) => c.commander_pair.toLowerCase().includes(search))
+      .slice(0, 8);
+  });
 
   // Mobile column group state
   let mobileColGroup = $state(1);
@@ -145,6 +202,11 @@
     if (commanderSearch.trim()) {
       const search = commanderSearch.toLowerCase().trim();
       result = result.filter(c => c.commander_pair.toLowerCase().includes(search));
+    }
+
+    // Benchmark filter (hide mode)
+    if (benchmarkMode && benchmarkHide && benchmarkCols.size > 0) {
+      result = result.filter(c => passesBenchmark(c));
     }
 
     // Min conversions filter
@@ -405,6 +467,9 @@
     commanderSearch = '';
     benchmarkMode = false;
     benchmarkCommander = null;
+    benchmarkSearch = '';
+    benchmarkHide = false;
+    benchmarkCols = new Set(['conversion_rate', 'top4_rate', 'champ_rate']);
   }
 
   function selectTournament(tid: string) {
@@ -803,16 +868,13 @@
       class:active={benchmarkMode}
       onclick={() => {
         benchmarkMode = !benchmarkMode;
-        if (!benchmarkMode) benchmarkCommander = null;
+        if (!benchmarkMode) {
+          benchmarkCommander = null;
+          benchmarkSearch = '';
+        }
       }}
-      title="Benchmark mode - click a commander to set as benchmark"
+      title="Benchmark mode"
     >📊</button>
-    {#if benchmarkCommander}
-      <span class="benchmark-indicator" title="Benchmark: {benchmarkCommander}">
-        vs {benchmarkCommander.length > 15 ? benchmarkCommander.slice(0, 15) + '...' : benchmarkCommander}
-        <button class="benchmark-clear" onclick={() => benchmarkCommander = null}>×</button>
-      </span>
-    {/if}
   </div>
 
   <div class="top-filter">
@@ -865,6 +927,60 @@
 <div class="table-container">
   <table class="show-g{mobileColGroup}">
     <thead>
+      {#if benchmarkMode}
+      <tr class="benchmark-row">
+        <td colspan="3" class="benchmark-controls">
+          <div class="benchmark-controls-inner">
+            <span class="benchmark-label">📊</span>
+            <div class="benchmark-source">
+              <div class="benchmark-search-wrap">
+                <input
+                  type="text"
+                  class="benchmark-search-input"
+                  placeholder={benchmarkCommander || '>0 ±EV'}
+                  bind:value={benchmarkSearch}
+                  onfocus={() => benchmarkShowDropdown = true}
+                  onblur={() => setTimeout(() => benchmarkShowDropdown = false, 200)}
+                />
+                {#if benchmarkShowDropdown && benchmarkSearchResults().length > 0}
+                  <div class="benchmark-dropdown">
+                    {#each benchmarkSearchResults() as cmd}
+                      <button
+                        class="benchmark-dropdown-item"
+                        onmousedown={() => {
+                          benchmarkCommander = cmd.commander_pair;
+                          benchmarkSearch = '';
+                          benchmarkShowDropdown = false;
+                        }}
+                      >{cmd.commander_pair}</button>
+                    {/each}
+                  </div>
+                {/if}
+              </div>
+              {#if benchmarkCommander}
+                <button class="benchmark-clear-btn" onclick={() => { benchmarkCommander = null; benchmarkSearch = ''; }}>×</button>
+              {/if}
+            </div>
+            <button
+              class="benchmark-hide-toggle"
+              class:active={benchmarkHide}
+              onclick={() => benchmarkHide = !benchmarkHide}
+              title={benchmarkHide ? 'Hiding non-qualifying' : 'Greying out non-qualifying'}
+            >{benchmarkHide ? 'Hide' : 'Grey'}</button>
+          </div>
+        </td>
+        <td class="benchmark-check col-g1"><input type="checkbox" checked={benchmarkCols.has('entries')} onchange={() => toggleBenchmarkCol('entries')} /></td>
+        <td class="benchmark-check col-g1"><input type="checkbox" checked={benchmarkCols.has('meta_pct')} onchange={() => toggleBenchmarkCol('meta_pct')} /></td>
+        <td class="benchmark-check col-g2"><input type="checkbox" checked={benchmarkCols.has('win_rate')} onchange={() => toggleBenchmarkCol('win_rate')} /></td>
+        <td class="benchmark-check col-g2"><input type="checkbox" checked={benchmarkCols.has('swiss5')} onchange={() => toggleBenchmarkCol('swiss5')} /></td>
+        <td class="benchmark-check col-g3"><input type="checkbox" checked={benchmarkCols.has('conversions')} onchange={() => toggleBenchmarkCol('conversions')} /></td>
+        <td class="benchmark-check col-g3"><input type="checkbox" checked={benchmarkCols.has('conversion_rate')} onchange={() => toggleBenchmarkCol('conversion_rate')} /></td>
+        <td class="benchmark-check col-g4"><input type="checkbox" checked={benchmarkCols.has('top4s')} onchange={() => toggleBenchmarkCol('top4s')} /></td>
+        <td class="benchmark-check col-g4"><input type="checkbox" checked={benchmarkCols.has('top4_rate')} onchange={() => toggleBenchmarkCol('top4_rate')} /></td>
+        <td class="benchmark-check col-g5"><input type="checkbox" checked={benchmarkCols.has('championships')} onchange={() => toggleBenchmarkCol('championships')} /></td>
+        <td class="benchmark-check col-g5"><input type="checkbox" checked={benchmarkCols.has('champ_rate')} onchange={() => toggleBenchmarkCol('champ_rate')} /></td>
+      </tr>
+      {/if}
       <tr>
         <th style="width: 40px">#</th>
         <th
@@ -979,7 +1095,8 @@
         {@const drawRate = totalGames > 0 ? cmd.total_draws / totalGames : 0}
         {@const rank = i + 1}
         {@const expanded = isExpanded(cmd.commander_pair)}
-        <tr class="cmd-row" class:expanded onclick={() => toggleRow(cmd.commander_pair)}>
+        {@const meetsBenchmark = passesBenchmark(cmd)}
+        <tr class="cmd-row" class:expanded class:benchmark-fail={benchmarkMode && !benchmarkHide && !meetsBenchmark} onclick={() => toggleRow(cmd.commander_pair)}>
           <td class="rank-cell">
             <span class="expand-arrow">{expanded ? '▼' : '▶'}</span>
             {rank}
@@ -1585,31 +1702,137 @@
     min-width: auto;
   }
 
-  .benchmark-indicator {
+  /* Benchmark row */
+  .benchmark-row {
+    background: var(--bg-tertiary);
+  }
+
+  .benchmark-row td {
+    padding: 4px 6px;
+    border-bottom: 2px solid var(--accent);
+  }
+
+  .benchmark-controls {
+    padding: 4px 8px !important;
+  }
+
+  .benchmark-controls-inner {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .benchmark-label {
+    font-size: 0.85rem;
+  }
+
+  .benchmark-source {
     display: flex;
     align-items: center;
     gap: 4px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .benchmark-search-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .benchmark-search-input {
+    width: 100%;
+    padding: 2px 6px;
+    font-size: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--surface);
+    color: var(--text);
+  }
+
+  .benchmark-search-input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .benchmark-search-input::placeholder {
+    color: var(--text-muted);
+  }
+
+  .benchmark-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    z-index: 20;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .benchmark-dropdown-item {
+    display: block;
+    width: 100%;
     padding: 4px 8px;
+    text-align: left;
+    background: none;
+    border: none;
+    color: var(--text);
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+
+  .benchmark-dropdown-item:hover {
     background: var(--accent);
     color: white;
-    border-radius: 4px;
-    font-size: 0.75rem;
+  }
+
+  .benchmark-clear-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0 4px;
+    font-size: 1rem;
+    line-height: 1;
+  }
+
+  .benchmark-clear-btn:hover {
+    color: var(--text);
+  }
+
+  .benchmark-hide-toggle {
+    padding: 2px 6px;
+    font-size: 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--surface);
+    color: var(--text-muted);
+    cursor: pointer;
     white-space: nowrap;
   }
 
-  .benchmark-clear {
-    background: none;
-    border: none;
+  .benchmark-hide-toggle.active {
+    background: var(--accent);
     color: white;
-    cursor: pointer;
-    padding: 0 2px;
-    font-size: 1rem;
-    line-height: 1;
-    opacity: 0.7;
+    border-color: var(--accent);
   }
 
-  .benchmark-clear:hover {
-    opacity: 1;
+  .benchmark-check {
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  .benchmark-check input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+  }
+
+  .benchmark-fail {
+    opacity: 0.35;
   }
 
   /* Color filter */
