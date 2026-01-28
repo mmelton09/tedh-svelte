@@ -28,6 +28,10 @@
   let sortByGains = $state(false);
   let commanderSearch = $state('');
 
+  // Benchmark mode
+  let benchmarkMode = $state(false);
+  let benchmarkCommander = $state<string | null>(null);
+
   // Mobile column group state
   let mobileColGroup = $state(1);
 
@@ -399,6 +403,8 @@
     topFilterCustom = 100;
     topFilterStat = 'elo';
     commanderSearch = '';
+    benchmarkMode = false;
+    benchmarkCommander = null;
   }
 
   function selectTournament(tid: string) {
@@ -792,6 +798,21 @@
       <button class="pill pill-small" class:active={sortByGains} onclick={() => sortByGains = !sortByGains} title="Sort by delta values">↕</button>
     {/if}
     <button class="pill" class:active={showMedals} onclick={() => showMedals = !showMedals} title="Show medals for top 3">🏅</button>
+    <button
+      class="pill"
+      class:active={benchmarkMode}
+      onclick={() => {
+        benchmarkMode = !benchmarkMode;
+        if (!benchmarkMode) benchmarkCommander = null;
+      }}
+      title="Benchmark mode - click a commander to set as benchmark"
+    >📊</button>
+    {#if benchmarkCommander}
+      <span class="benchmark-indicator" title="Benchmark: {benchmarkCommander}">
+        vs {benchmarkCommander.length > 15 ? benchmarkCommander.slice(0, 15) + '...' : benchmarkCommander}
+        <button class="benchmark-clear" onclick={() => benchmarkCommander = null}>×</button>
+      </span>
+    {/if}
   </div>
 
   <div class="top-filter">
@@ -851,14 +872,16 @@
           class:sorted-asc={sortCol === 'commander_pair' && sortAsc}
           class:sorted-desc={sortCol === 'commander_pair' && !sortAsc}
         >
-          <span class="commander-header" onclick={() => handleSort('commander_pair')}>Commander</span>
-          <input
-            type="text"
-            class="commander-search"
-            placeholder="Search..."
-            bind:value={commanderSearch}
-            onclick={(e) => e.stopPropagation()}
-          />
+          <div class="commander-header-row">
+            <span class="commander-header" onclick={() => handleSort('commander_pair')}>Commander</span>
+            <input
+              type="text"
+              class="commander-search"
+              placeholder="Search..."
+              bind:value={commanderSearch}
+              onclick={(e) => e.stopPropagation()}
+            />
+          </div>
         </th>
         <th
           class="metric colors-col col-g1"
@@ -1562,6 +1585,33 @@
     min-width: auto;
   }
 
+  .benchmark-indicator {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background: var(--accent);
+    color: white;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+  }
+
+  .benchmark-clear {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: 0 2px;
+    font-size: 1rem;
+    line-height: 1;
+    opacity: 0.7;
+  }
+
+  .benchmark-clear:hover {
+    opacity: 1;
+  }
+
   /* Color filter */
   .color-filter {
     display: flex;
@@ -1757,26 +1807,30 @@
     cursor: default;
   }
 
+  .commander-header-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
   .commander-header {
     cursor: pointer;
   }
 
   .commander-search {
-    display: block;
-    width: 100%;
-    max-width: 150px;
     padding: 2px 6px;
-    margin-top: 4px;
     font-size: 0.75rem;
     border: 1px solid var(--border);
     border-radius: 3px;
     background: var(--surface);
     color: var(--text);
+    width: 80px;
   }
 
   .commander-search:focus {
     outline: none;
     border-color: var(--accent);
+    width: 120px;
   }
 
   .commander-search::placeholder {
