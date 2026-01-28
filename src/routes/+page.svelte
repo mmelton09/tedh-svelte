@@ -26,6 +26,7 @@
   // Additional filters
   let top4Filter = $state('none');
   let sortByGains = $state(false);
+  let commanderSearch = $state('');
 
   // Mobile column group state
   let mobileColGroup = $state(1);
@@ -135,6 +136,12 @@
   // Derived: filtered and sorted commanders (instant!)
   let filteredCommanders = $derived(() => {
     let result = data.commanders.filter(c => c.entries >= minEntries);
+
+    // Commander name search
+    if (commanderSearch.trim()) {
+      const search = commanderSearch.toLowerCase().trim();
+      result = result.filter(c => c.commander_pair.toLowerCase().includes(search));
+    }
 
     // Min conversions filter
     if (minConv > 0) {
@@ -391,6 +398,7 @@
     topFilterValue = 'top';
     topFilterCustom = 100;
     topFilterStat = 'elo';
+    commanderSearch = '';
   }
 
   function selectTournament(tid: string) {
@@ -839,11 +847,18 @@
       <tr>
         <th style="width: 40px">#</th>
         <th
+          class="commander-col"
           class:sorted-asc={sortCol === 'commander_pair' && sortAsc}
           class:sorted-desc={sortCol === 'commander_pair' && !sortAsc}
-          onclick={() => handleSort('commander_pair')}
         >
-          Commander
+          <span class="commander-header" onclick={() => handleSort('commander_pair')}>Commander</span>
+          <input
+            type="text"
+            class="commander-search"
+            placeholder="Search..."
+            bind:value={commanderSearch}
+            onclick={(e) => e.stopPropagation()}
+          />
         </th>
         <th
           class="metric colors-col col-g1"
@@ -1736,6 +1751,36 @@
   thead th {
     background: var(--bg-secondary);
     border-bottom: 2px solid var(--border);
+  }
+
+  .commander-col {
+    cursor: default;
+  }
+
+  .commander-header {
+    cursor: pointer;
+  }
+
+  .commander-search {
+    display: block;
+    width: 100%;
+    max-width: 150px;
+    padding: 2px 6px;
+    margin-top: 4px;
+    font-size: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--surface);
+    color: var(--text);
+  }
+
+  .commander-search:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .commander-search::placeholder {
+    color: var(--text-muted);
   }
 
   .rank-cell {
