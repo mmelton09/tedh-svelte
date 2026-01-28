@@ -315,17 +315,40 @@
   }
 
   function shiftPeriod(direction: number) {
-    // Shift the date range by the current period's duration
     if (!data.periodStart || !data.periodEnd) return;
     const start = new Date(data.periodStart);
     const end = new Date(data.periodEnd);
-    const duration = end.getTime() - start.getTime();
 
-    const newStart = new Date(start.getTime() + (direction * duration));
-    const newEnd = new Date(end.getTime() + (direction * duration));
+    // Check if this looks like a calendar month (starts on 1st, ends on last day of month)
+    const isMonthPeriod = start.getDate() === 1 &&
+      end.getDate() === new Date(end.getFullYear(), end.getMonth() + 1, 0).getDate();
 
-    // Don't go into the future
-    if (newEnd > new Date()) return;
+    let newStart: Date;
+    let newEnd: Date;
+
+    if (isMonthPeriod) {
+      // Shift by calendar month
+      newStart = new Date(start.getFullYear(), start.getMonth() + direction, 1);
+      newEnd = new Date(newStart.getFullYear(), newStart.getMonth() + 1, 0); // Last day of that month
+    } else {
+      // Shift by duration for non-month periods
+      const duration = end.getTime() - start.getTime() + (24 * 60 * 60 * 1000); // +1 day since end is inclusive
+      newStart = new Date(start.getTime() + (direction * duration));
+      newEnd = new Date(end.getTime() + (direction * duration));
+    }
+
+    // Don't go into the future - cap at today
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    if (newEnd > today) {
+      if (direction > 0) {
+        // Going forward - cap end at today
+        newEnd = new Date();
+        newEnd.setHours(0, 0, 0, 0);
+      } else {
+        return; // Shouldn't happen going backward
+      }
+    }
 
     const params = new URLSearchParams($page.url.searchParams);
     params.set('period', 'custom');
