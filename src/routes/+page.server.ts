@@ -236,10 +236,14 @@ export const load: PageServerLoad = async ({ url }) => {
     .limit(50);
 
   // Fetch live tournaments separately (always, regardless of date/size filters)
-  const { data: liveTournaments } = await supabase
-    .from('tournaments')
-    .select('tid, tournament_name, total_players, start_date')
-    .in('tid', LIVE_TOURNAMENT_IDS);
+  let liveTournaments: any[] = [];
+  if (LIVE_TOURNAMENT_IDS.length > 0) {
+    const { data } = await supabase
+      .from('tournaments')
+      .select('tid, tournament_name, total_players, start_date')
+      .in('tid', LIVE_TOURNAMENT_IDS);
+    liveTournaments = data || [];
+  }
 
   // If a specific tournament is selected, compute stats for that tournament (live)
   if (tid) {
@@ -313,7 +317,7 @@ export const load: PageServerLoad = async ({ url }) => {
         period,
         minSize,
         recentTournaments: recentTournaments || [],
-        liveTournaments: liveTournaments || [],
+        liveTournaments,
         tournamentCount: tournamentCount || 0,
         selectedTournament: null,
         periodStart: dateRange.start,
