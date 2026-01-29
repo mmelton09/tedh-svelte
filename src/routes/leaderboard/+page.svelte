@@ -178,14 +178,6 @@
     return ((count / entries) * 100).toFixed(1) + '%';
   }
 
-  function getTierBadge(tier: string | undefined): { label: string; class: string } {
-    switch (tier) {
-      case 'proven': return { label: 'P', class: 'tier-proven' };
-      case 'rising': return { label: 'R', class: 'tier-rising' };
-      default: return { label: '?', class: 'tier-provisional' };
-    }
-  }
-
   const periodGroups = {
     recent: [
       { value: 'last_week', label: 'Last Week' }
@@ -288,11 +280,6 @@
   Avg ELO: <strong>{data.avgElo?.toFixed(0) || '-'}</strong>
   &nbsp;|&nbsp;
   Top: <strong>{data.maxElo?.toFixed(0) || '-'}</strong>
-  &nbsp;|&nbsp;
-  <span class="tier-thresholds">
-    <span class="tier-proven">P</span>≥{data.tierThresholds?.provenGames || 50}g (p{data.tierThresholds?.provenPct || '?'})
-    <span class="tier-rising">R</span>≥{data.tierThresholds?.risingGames || 30}g (p{data.tierThresholds?.risingPct || '?'})
-  </span>
 </div>
 
 <!-- Column Group Toggle (mobile) -->
@@ -324,7 +311,7 @@
     <label for="minSize">Event Size:</label>
     <select
       id="minSize"
-      class:filter-active={data.minSize !== 50}
+      class:filter-active={data.minSize !== 16}
       value={String(data.minSize)}
       onchange={(e) => updateServerParams({ min_size: parseInt(e.currentTarget.value) || 50 })}
     >
@@ -418,13 +405,11 @@
     <tbody>
       {#each pagedPlayers as player, i}
         {@const rank = getRank(i)}
-        {@const tierBadge = getTierBadge(player.tier)}
         <tr
           onclick={() => goto(`/players/${player.player_id}`)}
         >
           <td class="metric">{rank}</td>
           <td>
-            <span class="tier-badge {tierBadge.class}" title="{player.tier} ({player.games} games)">{tierBadge.label}</span>
             <a href="/players/{player.player_id}" class="player-name" onclick={(e) => e.stopPropagation()}>
               {player.player_name}
             </a>
@@ -495,10 +480,7 @@
 <!-- Legend -->
 <div class="legend">
   <strong>Legend:</strong>
-  <span class="tier-proven">P</span>=Proven (p90)
-  <span class="tier-rising">R</span>=Rising (p70)
-  <span class="tier-provisional">?</span>=Provisional |
-  5wiss = (Win% × 5) + (Draw% × 1) |
+  5wiss = (Win% x 5) + (Draw% x 1) |
   AvgX% = Average placement percentile (100% = always 1st)
 </div>
 
@@ -789,64 +771,6 @@
   .elo-high { color: var(--accent); font-weight: 600; }
   .elo-mid { color: #8BC34A; }
   .elo-low { color: var(--text-muted); }
-
-  .tier-badge {
-    display: inline-block;
-    width: 16px;
-    height: 16px;
-    line-height: 16px;
-    text-align: center;
-    font-size: 10px;
-    font-weight: bold;
-    border-radius: 3px;
-    margin-right: 6px;
-  }
-
-  .tier-proven {
-    background: var(--accent);
-    color: #000;
-  }
-
-  .tier-rising {
-    background: #8BC34A;
-    color: #000;
-  }
-
-  .tier-provisional {
-    background: #555;
-    color: #999;
-  }
-
-  .tier-thresholds {
-    font-size: 0.9em;
-  }
-
-  .tier-thresholds .tier-proven,
-  .tier-thresholds .tier-rising {
-    display: inline-block;
-    width: 14px;
-    height: 14px;
-    line-height: 14px;
-    text-align: center;
-    font-size: 9px;
-    font-weight: bold;
-    border-radius: 2px;
-    margin-right: 2px;
-  }
-
-  .legend .tier-proven,
-  .legend .tier-rising,
-  .legend .tier-provisional {
-    display: inline-block;
-    width: 14px;
-    height: 14px;
-    line-height: 14px;
-    text-align: center;
-    font-size: 9px;
-    font-weight: bold;
-    border-radius: 2px;
-    margin: 0 2px;
-  }
 
   .elo-rank {
     color: #666;

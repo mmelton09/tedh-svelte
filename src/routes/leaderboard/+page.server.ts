@@ -29,24 +29,9 @@ function getPeriodLabel(period: string): string {
   return labels[period] || period;
 }
 
-function bayesianWinRate(wins: number, games: number, priorGames = 30): number {
-  const priorWinRate = 0.25;
-  const priorWins = priorGames * priorWinRate;
-  return (wins + priorWins) / (games + priorGames);
-}
-
-const PROVEN_THRESHOLD = 50;
-const RISING_THRESHOLD = 30;
-
-function getPlayerTier(games: number): 'proven' | 'rising' | 'provisional' {
-  if (games >= PROVEN_THRESHOLD) return 'proven';
-  if (games >= RISING_THRESHOLD) return 'rising';
-  return 'provisional';
-}
-
 export const load: PageServerLoad = async ({ url }) => {
   const period = url.searchParams.get('period') || 'all';
-  const minSize = parseInt(url.searchParams.get('min_size') || '50') || 50;
+  const minSize = parseInt(url.searchParams.get('min_size') || '16') || 16;
   const minEntries = parseInt(url.searchParams.get('min_entries') || '1') || 1;
   const rankedOnly = url.searchParams.get('ranked') === 'true';
   const search = url.searchParams.get('search') || '';
@@ -67,7 +52,6 @@ export const load: PageServerLoad = async ({ url }) => {
       avgElo: null,
       maxElo: null,
       periodLabel: 'Unsupported period',
-      tierThresholds: { provenGames: PROVEN_THRESHOLD, risingGames: RISING_THRESHOLD, provenPct: 0, risingPct: 0 },
     };
   }
 
@@ -99,49 +83,30 @@ export const load: PageServerLoad = async ({ url }) => {
       avgElo: null,
       maxElo: null,
       periodLabel: getPeriodLabel(period),
-      tierThresholds: { provenGames: PROVEN_THRESHOLD, risingGames: RISING_THRESHOLD, provenPct: 0, risingPct: 0 },
     };
   }
 
-  const allGames = (players || [])
-    .map(p => (p.total_wins || 0) + (p.total_losses || 0) + (p.total_draws || 0))
-    .filter(g => g > 0)
-    .sort((a, b) => a - b);
-
-  const provenPct = allGames.length > 0
-    ? Math.round((allGames.filter(g => g < PROVEN_THRESHOLD).length / allGames.length) * 100)
-    : 0;
-  const risingPct = allGames.length > 0
-    ? Math.round((allGames.filter(g => g < RISING_THRESHOLD).length / allGames.length) * 100)
-    : 0;
-
-  const formattedPlayers = (players || []).map((p, idx) => {
-    const games = (p.total_wins || 0) + (p.total_losses || 0) + (p.total_draws || 0);
-    return {
-      player_id: p.player_id,
-      player_name: p.player_name,
-      openskill_elo: p.openskill_elo,
-      entries: p.entries,
-      wins: p.total_wins,
-      losses: p.total_losses,
-      draws: p.total_draws,
-      games,
-      conversions: p.conversions,
-      top4s: p.top4s,
-      championships: p.championships,
-      main_commander: p.main_commander,
-      commander_pct: p.commander_pct,
-      avg_placement_pct: p.avg_placement_pct,
-      win_rate: p.win_rate,
-      bayesian_win_rate: bayesianWinRate(p.total_wins || 0, games),
-      tier: getPlayerTier(games),
-      five_swiss: p.five_swiss,
-      conversion_rate: p.conversion_rate,
-      top4_rate: p.top4_rate,
-      champ_rate: p.champ_rate,
-      elo_rank: idx + 1,
-    };
-  });
+  const formattedPlayers = (players || []).map((p, idx) => ({
+    player_id: p.player_id,
+    player_name: p.player_name,
+    openskill_elo: p.openskill_elo,
+    entries: p.entries,
+    wins: p.total_wins,
+    losses: p.total_losses,
+    draws: p.total_draws,
+    conversions: p.conversions,
+    top4s: p.top4s,
+    championships: p.championships,
+    main_commander: p.main_commander,
+    commander_pct: p.commander_pct,
+    avg_placement_pct: p.avg_placement_pct,
+    win_rate: p.win_rate,
+    five_swiss: p.five_swiss,
+    conversion_rate: p.conversion_rate,
+    top4_rate: p.top4_rate,
+    champ_rate: p.champ_rate,
+    elo_rank: idx + 1,
+  }));
 
   const eloValues = formattedPlayers.map(p => p.openskill_elo).filter(e => e != null) as number[];
   const avgElo = eloValues.length > 0 ? eloValues.reduce((a, b) => a + b, 0) / eloValues.length : null;
@@ -158,11 +123,5 @@ export const load: PageServerLoad = async ({ url }) => {
     avgElo,
     maxElo,
     periodLabel: getPeriodLabel(period),
-    tierThresholds: {
-      provenGames: PROVEN_THRESHOLD,
-      risingGames: RISING_THRESHOLD,
-      provenPct,
-      risingPct
-    },
   };
 };
