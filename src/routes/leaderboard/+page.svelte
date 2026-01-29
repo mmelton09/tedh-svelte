@@ -6,18 +6,27 @@
 
   let searchInput = $state(data.search || '');
   let colGroup = $state(1);
+  let sortCol = $state('openskill_elo');
+  let sortAsc = $state(false);
+  let currentPage = $state(1);
+  let perPage = $state(100);
 
   // Date range state
   let dateStart = $state(data.periodStart || '');
   let dateEnd = $state(data.periodEnd || '');
 
-  // Keep date inputs in sync with server data
   $effect(() => {
     dateStart = data.periodStart || '';
     dateEnd = data.periodEnd || '';
   });
 
-  async function updateParams(updates: Record<string, string | number>) {
+  // Reset page when search changes
+  $effect(() => {
+    searchInput;
+    currentPage = 1;
+  });
+
+  async function updateServerParams(updates: Record<string, string | number>) {
     const params = new URLSearchParams($page.url.searchParams);
     for (const [key, value] of Object.entries(updates)) {
       if (value === '' || value === null || value === undefined) {
@@ -30,15 +39,9 @@
     await invalidateAll();
   }
 
-  let filteredPlayers = $derived(
-    searchInput
-      ? data.players.filter((p: any) => p.player_name.toLowerCase().includes(searchInput.toLowerCase()))
-      : data.players
-  );
-
   function applyDateRange() {
     if (!dateStart || !dateEnd) return;
-    updateParams({ period: 'custom', start: dateStart, end: dateEnd, page: 1 });
+    updateServerParams({ period: 'custom', start: dateStart, end: dateEnd });
   }
 
   function shiftPeriod(direction: number) {
@@ -46,38 +49,79 @@
     const start = new Date(data.periodStart);
     const end = new Date(data.periodEnd);
     const duration = end.getTime() - start.getTime();
-
     const newStart = new Date(start.getTime() + (direction * duration));
     const newEnd = new Date(end.getTime() + (direction * duration));
-
-    // Don't go into the future
     if (newEnd > new Date()) return;
-
-    updateParams({
+    updateServerParams({
       period: 'custom',
       start: newStart.toISOString().split('T')[0],
       end: newEnd.toISOString().split('T')[0],
-      page: 1
     });
   }
 
   function clearSearch() {
     searchInput = '';
-    updateParams({ search: '', page: 1 });
   }
 
   function handleSort(col: string) {
-    if (data.sortBy === col) {
-      updateParams({ order: data.sortOrder === 'desc' ? 'asc' : 'desc' });
+    if (sortCol === col) {
+      sortAsc = !sortAsc;
     } else {
-      updateParams({ sort: col, order: 'desc' });
+      sortCol = col;
+      sortAsc = col === 'player_name';
+    }
+    currentPage = 1;
+  }
+
+  function calcGames(p: any): number {
+    return (p.wins || 0) + (p.losses || 0) + (p.draws || 0);
+  }
+
+  function getSortValue(p: any, col: string): number | string {
+    switch (col) {
+      case 'openskill_elo': return p.openskill_elo || 0;
+      case 'player_name': return p.player_name?.toLowerCase() || '';
+      case 'entries': return p.entries || 0;
+      case 'wins': return (p.wins || 0) - (p.losses || 0);
+      case 'win_rate': return p.win_rate || 0;
+      case 'five_swiss': return p.five_swiss || 0;
+      case 'conversions': return p.conversions || 0;
+      case 'conv_pct': return p.conversion_rate || 0;
+      case 'top4s': return p.top4s || 0;
+      case 'top4_pct': return p.top4_rate || 0;
+      case 'championships': return p.championships || 0;
+      case 'champ_pct': return p.champ_rate || 0;
+      case 'placement_pct': return p.avg_placement_pct || 0;
+      default: return p.openskill_elo || 0;
     }
   }
 
-  function goToPage(newPage: number) {
-    if (newPage >= 1 && newPage <= data.totalPages) {
-      updateParams({ page: newPage });
+  let filteredPlayers = $derived.by(() => {
+    let result = data.players;
+    if (searchInput.length > 0) {
+      const q = searchInput.toLowerCase();
+      result = result.filter((p: any) => p.player_name.toLowerCase().includes(q));
     }
+    result = [...result].sort((a: any, b: any) => {
+      const va = getSortValue(a, sortCol);
+      const vb = getSortValue(b, sortCol);
+      let cmp = 0;
+      if (typeof va === 'string' && typeof vb === 'string') {
+        cmp = va.localeCompare(vb);
+      } else {
+        cmp = (va as number) - (vb as number);
+      }
+      if (cmp === 0) cmp = (b.entries || 0) - (a.entries || 0);
+      return sortAsc ? cmp : -cmp;
+    });
+    return result;
+  });
+
+  let totalPages = $derived(Math.max(1, Math.ceil(filteredPlayers.length / perPage)));
+  let pagedPlayers = $derived(filteredPlayers.slice((currentPage - 1) * perPage, currentPage * perPage));
+
+  function goToPage(p: number) {
+    if (p >= 1 && p <= totalPages) currentPage = p;
   }
 
   function formatPct(val: number | null, decimals = 1): string {
@@ -98,24 +142,19 @@
   }
 
   function getSortIndicator(col: string): string {
-    if (data.sortBy !== col) return '';
-    return data.sortOrder === 'desc' ? ' ▼' : ' ▲';
+    if (sortCol !== col) return '';
+    return sortAsc ? ' ▲' : ' ▼';
   }
 
   function getRank(index: number): number {
-    return (data.page - 1) * data.perPage + index + 1;
+    return (currentPage - 1) * perPage + index + 1;
   }
 
   function shortenCommander(name: string | null): string {
     if (!name) return '-';
-    // Shorten partner pairs
     if (name.includes(' / ')) {
       const [a, b] = name.split(' / ');
-      const shortenName = (n: string) => {
-        const parts = n.split(',')[0].split(' ');
-        return parts[0];
-      };
-      return `${shortenName(a)} / ${shortenName(b)}`;
+      return `${a.split(',')[0].split(' ')[0]} / ${b.split(',')[0].split(' ')[0]}`;
     }
     return name.length > 20 ? name.substring(0, 20) + '...' : name;
   }
@@ -147,7 +186,6 @@
     }
   }
 
-  // Period groups for toggles
   const periodGroups = {
     recent: [
       { value: 'last_week', label: 'Last Week' }
@@ -181,7 +219,7 @@
       <button
         class="period-btn"
         class:active={data.period === p.value}
-        onclick={() => updateParams({ period: p.value, page: 1 })}
+        onclick={() => updateServerParams({ period: p.value })}
       >{p.label}</button>
     {/each}
   </span>
@@ -191,7 +229,7 @@
       <button
         class="period-btn"
         class:active={data.period === p.value}
-        onclick={() => updateParams({ period: p.value, page: 1 })}
+        onclick={() => updateServerParams({ period: p.value })}
       >{p.label}</button>
     {/each}
   </span>
@@ -201,7 +239,7 @@
       <button
         class="period-btn"
         class:active={data.period === p.value}
-        onclick={() => updateParams({ period: p.value, page: 1 })}
+        onclick={() => updateServerParams({ period: p.value })}
       >{p.label}</button>
     {/each}
   </span>
@@ -212,7 +250,7 @@
       <button
         class="period-btn"
         class:active={data.period === p.value}
-        onclick={() => updateParams({ period: p.value, page: 1 })}
+        onclick={() => updateServerParams({ period: p.value })}
       >{p.label}</button>
     {/each}
   </span>
@@ -242,7 +280,10 @@
   </span>
   &nbsp;|&nbsp;
   {/if}
-  <strong>{data.totalCount.toLocaleString()}</strong> players
+  <strong>{filteredPlayers.length.toLocaleString()}</strong> players
+  {#if searchInput}
+    <span class="muted">(of {data.totalCount.toLocaleString()})</span>
+  {/if}
   &nbsp;|&nbsp;
   Avg ELO: <strong>{data.avgElo?.toFixed(0) || '-'}</strong>
   &nbsp;|&nbsp;
@@ -273,7 +314,6 @@
       bind:value={searchInput}
       placeholder="Player name..."
       class="search-input"
-      onkeydown={(e) => e.key === 'Enter' && updateParams({ search: searchInput, page: 1 })}
     />
     {#if searchInput}
       <button class="clear-search" onclick={clearSearch}>✕</button>
@@ -286,7 +326,7 @@
       id="minSize"
       class:filter-active={data.minSize !== 50}
       value={String(data.minSize)}
-      onchange={(e) => updateParams({ min_size: parseInt(e.currentTarget.value) || 50, page: 1 })}
+      onchange={(e) => updateServerParams({ min_size: parseInt(e.currentTarget.value) || 50 })}
     >
       <option value="16">16+</option>
       <option value="30">30+</option>
@@ -302,7 +342,7 @@
       id="minEntries"
       class:filter-active={data.minEntries !== 1}
       value={String(data.minEntries)}
-      onchange={(e) => updateParams({ min_entries: parseInt(e.currentTarget.value) || 1, page: 1 })}
+      onchange={(e) => updateServerParams({ min_entries: parseInt(e.currentTarget.value) || 1 })}
     >
       <option value="1">1+</option>
       <option value="3">3+</option>
@@ -316,8 +356,8 @@
     <label for="perPage">Per Page:</label>
     <select
       id="perPage"
-      value={String(data.perPage)}
-      onchange={(e) => updateParams({ per_page: parseInt(e.currentTarget.value), page: 1 })}
+      value={String(perPage)}
+      onchange={(e) => { perPage = parseInt(e.currentTarget.value); currentPage = 1; }}
     >
       <option value="50">50</option>
       <option value="100">100</option>
@@ -376,7 +416,7 @@
       </tr>
     </thead>
     <tbody>
-      {#each filteredPlayers as player, i}
+      {#each pagedPlayers as player, i}
         {@const rank = getRank(i)}
         {@const tierBadge = getTierBadge(player.tier)}
         <tr
@@ -421,33 +461,33 @@
 </div>
 
 <!-- Pagination -->
-{#if data.totalPages > 1}
+{#if totalPages > 1}
   <div class="pagination">
     <button
       class="page-btn"
-      disabled={data.page <= 1}
+      disabled={currentPage <= 1}
       onclick={() => goToPage(1)}
     >First</button>
     <button
       class="page-btn"
-      disabled={data.page <= 1}
-      onclick={() => goToPage(data.page - 1)}
+      disabled={currentPage <= 1}
+      onclick={() => goToPage(currentPage - 1)}
     >Prev</button>
 
     <span class="page-info">
-      Page <strong>{data.page}</strong> of <strong>{data.totalPages}</strong>
-      &nbsp;({data.totalCount.toLocaleString()} total)
+      Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong>
+      &nbsp;({filteredPlayers.length.toLocaleString()} total)
     </span>
 
     <button
       class="page-btn"
-      disabled={data.page >= data.totalPages}
-      onclick={() => goToPage(data.page + 1)}
+      disabled={currentPage >= totalPages}
+      onclick={() => goToPage(currentPage + 1)}
     >Next</button>
     <button
       class="page-btn"
-      disabled={data.page >= data.totalPages}
-      onclick={() => goToPage(data.totalPages)}
+      disabled={currentPage >= totalPages}
+      onclick={() => goToPage(totalPages)}
     >Last</button>
   </div>
 {/if}
@@ -470,7 +510,7 @@
   New players start at 1500. Only "ranked" games (tournaments with complete pod data) affect ELO.
 </div>
 
-{#if data.players.length === 0}
+{#if pagedPlayers.length === 0}
   <p class="empty-state">No players found matching your criteria.</p>
 {/if}
 
@@ -492,7 +532,6 @@
     margin-top: 0.5rem;
   }
 
-  /* Period Toggle */
   .period-toggle {
     display: flex;
     justify-content: center;
@@ -547,7 +586,6 @@
     align-self: center;
   }
 
-  /* Stats Summary */
   .stats-summary {
     text-align: center;
     color: var(--text-muted);
@@ -559,6 +597,10 @@
 
   .stats-summary strong {
     color: var(--accent);
+  }
+
+  .stats-summary .muted {
+    color: var(--text-muted);
   }
 
   .date-nav-group {
@@ -598,7 +640,6 @@
     opacity: 0.5;
   }
 
-  /* Column Group Toggle */
   .col-group-toggle {
     display: none;
     justify-content: center;
@@ -622,7 +663,6 @@
     border-color: var(--accent);
   }
 
-  /* Filters */
   .filters {
     display: flex;
     justify-content: center;
@@ -690,7 +730,6 @@
     border-color: var(--accent);
   }
 
-  /* Table */
   thead {
     position: sticky;
     top: 0;
@@ -751,7 +790,6 @@
   .elo-mid { color: #8BC34A; }
   .elo-low { color: var(--text-muted); }
 
-  /* Tier badges */
   .tier-badge {
     display: inline-block;
     width: 16px;
@@ -816,7 +854,6 @@
     margin-left: 4px;
   }
 
-  /* Pagination */
   .pagination {
     display: flex;
     justify-content: center;
@@ -893,12 +930,10 @@
     padding: 2rem;
   }
 
-  /* Column groups - show all by default on desktop */
   .col-g1, .col-g2, .col-g3, .col-g4, .col-g5 {
     display: table-cell;
   }
 
-  /* Mobile: show column group toggle and hide inactive groups */
   @media (max-width: 1024px) {
     .col-group-toggle {
       display: flex;
