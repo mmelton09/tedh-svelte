@@ -426,7 +426,9 @@
           </td>
           <td class="metric col-g1 {getEloClass(player.openskill_elo)}">
             {formatElo(player.openskill_elo)}
-            <span class="elo-rank">(#{player.elo_rank || '-'})</span>
+            {#if sortCol !== 'openskill_elo'}
+              <span class="elo-rank">(#{player.elo_rank || '-'})</span>
+            {/if}
           </td>
           <td class="metric col-g2">{player.entries}</td>
           <td class="metric col-g2">{player.wins}-{player.losses}-{player.draws}</td>
