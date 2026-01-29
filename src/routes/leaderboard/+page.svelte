@@ -5,7 +5,6 @@
   let { data } = $props();
 
   let searchInput = $state(data.search || '');
-  let searchTimeout: ReturnType<typeof setTimeout>;
   let colGroup = $state(1);
 
   // Date range state
@@ -31,14 +30,11 @@
     await invalidateAll();
   }
 
-  function onSearchInput() {
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-      if (searchInput !== (data.search || '')) {
-        updateParams({ search: searchInput, page: 1 });
-      }
-    }, 300);
-  }
+  let filteredPlayers = $derived(
+    searchInput
+      ? data.players.filter((p: any) => p.player_name.toLowerCase().includes(searchInput.toLowerCase()))
+      : data.players
+  );
 
   function applyDateRange() {
     if (!dateStart || !dateEnd) return;
@@ -277,7 +273,7 @@
       bind:value={searchInput}
       placeholder="Player name..."
       class="search-input"
-      oninput={onSearchInput}
+      onkeydown={(e) => e.key === 'Enter' && updateParams({ search: searchInput, page: 1 })}
     />
     {#if searchInput}
       <button class="clear-search" onclick={clearSearch}>✕</button>
@@ -380,7 +376,7 @@
       </tr>
     </thead>
     <tbody>
-      {#each data.players as player, i}
+      {#each filteredPlayers as player, i}
         {@const rank = getRank(i)}
         {@const tierBadge = getTierBadge(player.tier)}
         <tr
