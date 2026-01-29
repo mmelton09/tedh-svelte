@@ -5,6 +5,7 @@
   let { data } = $props();
 
   let searchInput = $state(data.search || '');
+  let searchTimeout: ReturnType<typeof setTimeout>;
   let colGroup = $state(1);
 
   // Date range state
@@ -30,10 +31,13 @@
     await invalidateAll();
   }
 
-  function handleSearchKeydown(e: KeyboardEvent) {
-    if (e.key === 'Enter') {
-      updateParams({ search: searchInput, page: 1 });
-    }
+  function onSearchInput() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+      if (searchInput !== (data.search || '')) {
+        updateParams({ search: searchInput, page: 1 });
+      }
+    }, 300);
   }
 
   function applyDateRange() {
@@ -273,7 +277,7 @@
       bind:value={searchInput}
       placeholder="Player name..."
       class="search-input"
-      onkeydown={handleSearchKeydown}
+      oninput={onSearchInput}
     />
     {#if searchInput}
       <button class="clear-search" onclick={clearSearch}>✕</button>
