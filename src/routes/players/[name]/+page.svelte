@@ -156,6 +156,17 @@
     playerResults = [];
     goto(`/players/${encodeURIComponent(name)}`);
   }
+
+  function submitSearch() {
+    if (playerResults.length === 1) {
+      selectPlayer(playerResults[0].player_name);
+    } else if (playerSearch.length >= 2) {
+      showPlayerDropdown = false;
+      goto(`/leaderboard?search=${encodeURIComponent(playerSearch)}`);
+      playerSearch = '';
+      playerResults = [];
+    }
+  }
 </script>
 
 <div class="page-header">
@@ -167,6 +178,7 @@
       placeholder="Search players..."
       bind:value={playerSearch}
       oninput={(e) => onPlayerSearch(e.currentTarget.value)}
+      onkeydown={(e) => e.key === 'Enter' && submitSearch()}
       onfocus={() => showPlayerDropdown = true}
       onblur={() => setTimeout(() => showPlayerDropdown = false, 150)}
     />
