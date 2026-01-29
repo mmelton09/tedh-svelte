@@ -10,6 +10,28 @@ SvelteKit app for Tournament EDH (Magic: The Gathering) statistics. Migrated fro
 
 ## Critical: Supabase Query Patterns
 
+### Empty .in() Calls
+NEVER call `.in('column', [])` with an empty array — it hangs indefinitely in Supabase/PostgREST and causes 504 timeouts on Vercel. Always guard:
+```typescript
+if (ids.length > 0) {
+  const { data } = await supabase.from('table').select('*').in('id', ids);
+}
+```
+
+### Timeout Protection
+Server load functions should not hang if Supabase is unreachable (maintenance, outages). Use timeout wrappers for critical queries and throw SvelteKit errors so the error page renders instead of a raw Vercel 504:
+```typescript
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
+  ]);
+}
+```
+
+### Error Page
+`+error.svelte` handles errors within the site layout (nav stays visible). Database outages (502/503/504) show a "Repointing the Foundation" message. Always prefer throwing a SvelteKit `error()` over letting a function timeout silently.
+
 ### Row Limits
 - Default Supabase limit is 1000 rows - ALWAYS add `.limit(10000)` or `.limit(100000)` for large queries
 - Also check Supabase dashboard "Max Rows" setting
@@ -43,10 +65,11 @@ const playerData = entry?.players as unknown as { player_name: string } | null;
 - **Medals:** Use emojis (not text)
 
 ### Leaderboard (`/routes/leaderboard/`)
-- Player rankings
-- Default: 50+ player events, ranked players only
+- Player rankings — loads ALL players at once, client-side search/sort/pagination
+- Default: 16+ player events
 - **Qualification message:** "Qualification: 10+ ranked games in 30+ player tournaments"
 - Event size dropdown: 16+, 30+, 50+, 100+, 250+
+- ELO Methodology modal (click link at bottom of page)
 
 ### Player Page (`/routes/players/[name]/`)
 - Individual player stats
@@ -122,3 +145,5 @@ Key patterns from original site:
 3. **API errors**: Check if endpoint needs batching (see `/api/commander-tournaments`)
 4. **TypeScript errors on Supabase relations**: Cast through `unknown`
 5. **Data refresh failing**: Check tedh-stats workflow - likely IPv6/pooler issue
+6. **Site 504/502/503**: Likely Supabase outage or maintenance. Check status.supabase.com and project dashboard. The `+error.svelte` page will show a friendly message if server loads throw properly.
+7. **Empty .in() hanging**: Never pass empty array to `.in()` — guard with `if (ids.length > 0)`

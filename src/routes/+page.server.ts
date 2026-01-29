@@ -1,5 +1,13 @@
 import { supabase } from '$lib/supabase';
+import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Database timeout')), ms))
+  ]);
+}
 
 // Active live tournaments - edit this list when events go live
 const LIVE_TOURNAMENT_IDS: string[] = [
@@ -218,6 +226,8 @@ export const load: PageServerLoad = async ({ url }) => {
   const precalcPeriod = PRECALC_PERIODS[period];
   const precalcMinSize = getClosestMinSize(minSize);
 
+  try {
+
   // Fetch top tournaments by size for the featured bar
   let recentTournamentsQuery = supabase
     .from('tournaments')
@@ -337,6 +347,11 @@ export const load: PageServerLoad = async ({ url }) => {
     period, minSize, dateRange, recentTournaments || [], liveTournaments || [],
     topMode, topValue, topCustom, topStat
   );
+
+  } catch (e) {
+    console.error('Meta page load error:', e);
+    throw error(503, 'Database temporarily unavailable');
+  }
 };
 
 // Load stats for a single tournament

@@ -1,16 +1,25 @@
 import { supabase } from '$lib/supabase';
 import type { LayoutServerLoad } from './$types';
 
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  return Promise.race([
+    promise,
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), ms))
+  ]);
+}
+
 export const load: LayoutServerLoad = async () => {
-  // Get the most recent tournament date as a proxy for data freshness
-  const { data: latestTournament } = await supabase
-    .from('tournaments')
-    .select('start_date')
-    .order('start_date', { ascending: false })
-    .limit(1)
-    .single();
+  const result = await withTimeout(
+    supabase
+      .from('tournaments')
+      .select('start_date')
+      .order('start_date', { ascending: false })
+      .limit(1)
+      .single(),
+    5000
+  );
 
   return {
-    dataUpdated: latestTournament?.start_date || null
+    dataUpdated: result?.data?.start_date || null
   };
 };
