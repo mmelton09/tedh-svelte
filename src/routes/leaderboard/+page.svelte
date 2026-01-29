@@ -146,10 +146,6 @@
     return sortAsc ? ' ▲' : ' ▼';
   }
 
-  function getRank(index: number): number {
-    return (currentPage - 1) * perPage + index + 1;
-  }
-
   function shortenCommander(name: string | null): string {
     if (!name) return '-';
     if (name.includes(' / ')) {
@@ -404,11 +400,10 @@
     </thead>
     <tbody>
       {#each pagedPlayers as player, i}
-        {@const rank = getRank(i)}
         <tr
           onclick={() => goto(`/players/${player.player_id}`)}
         >
-          <td class="metric">{rank}</td>
+          <td class="metric">{player.elo_rank}</td>
           <td>
             <a href="/players/{player.player_id}" class="player-name" onclick={(e) => e.stopPropagation()}>
               {player.player_name}
