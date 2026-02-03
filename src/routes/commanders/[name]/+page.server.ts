@@ -73,6 +73,23 @@ function getDateRange(period: string): { start: string; end: string; label: stri
     case 'post_ban':
       return { start: '2024-09-23', end, label: 'Post-RC Era' };
 
+    case 'last_week': {
+      const weekAgo = new Date(now);
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      return { start: weekAgo.toISOString().split('T')[0], end, label: 'Last Week' };
+    }
+
+    case 'current_month': {
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      return { start: monthStart.toISOString().split('T')[0], end, label: now.toLocaleDateString('en-US', { month: 'short' }) };
+    }
+
+    case 'prev_month': {
+      const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+      return { start: prevMonthStart.toISOString().split('T')[0], end: prevMonthEnd.toISOString().split('T')[0], label: prevMonthStart.toLocaleDateString('en-US', { month: 'short' }) };
+    }
+
     case '30d':
     case '1m': {
       const thirtyDays = new Date(now);
@@ -108,6 +125,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
   const minSize = parseInt(url.searchParams.get('min_size') || '16') || 16;
   const period = url.searchParams.get('period') || '1y';
   const page = parseInt(url.searchParams.get('page') || '1') || 1;
+  const minEntries = parseInt(url.searchParams.get('min_entries') || '1') || 1;
   const perPage = 50;
   const sortBy = url.searchParams.get('sort') || 'placement_pct';
   const sortOrder = url.searchParams.get('order') || 'desc';
@@ -152,6 +170,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
   const precalcMinSize = getClosestMinSize(minSize);
 
   let pilots: any[] = [];
+  let allPilotsForSummary: any[] = [];
   let totalPilots = 0;
   let totalPages = 1;
 
@@ -178,7 +197,8 @@ export const load: PageServerLoad = async ({ params, url }) => {
       .eq('commander_pair', commanderName)
       .eq('period', precalcPeriod)
       .eq('min_size', precalcMinSize)
-      .eq('data_type', dataType);
+      .eq('data_type', dataType)
+      .gte('entries', minEntries);
 
     // Apply sorting
     const ascending = sortOrder === 'asc';
@@ -224,6 +244,146 @@ export const load: PageServerLoad = async ({ params, url }) => {
     } else {
       console.error('Error fetching from precalc table:', precalcError?.message);
     }
+  } else {
+    // Live query for dynamic periods (last_week, current_month, prev_month)
+    // First, find entries with this commander in the date range
+    const commanderNames = commanderName.split(' / ').map(n => n.trim());
+
+    // Get deck_commanders entries for this commander pair
+    const { data: cmdEntries } = await supabase
+      .from('deck_commanders')
+      .select('tid, player_id')
+      .in('commander_name', commanderNames)
+      .limit(100000);
+
+    if (!cmdEntries || cmdEntries.length === 0) {
+      // No entries with this commander at all - return empty
+    } else {
+      // Group by tid_player_id to find entries with ALL commanders in pair
+      const entryCommanderCount: Record<string, number> = {};
+      for (const dc of cmdEntries) {
+        const key = `${dc.tid}_${dc.player_id}`;
+        entryCommanderCount[key] = (entryCommanderCount[key] || 0) + 1;
+      }
+
+      // For partner commanders, need both; for single, need 1
+      const expectedCount = commanderNames.length;
+      const validEntryKeys = Object.entries(entryCommanderCount)
+        .filter(([_, count]) => count === expectedCount)
+        .map(([key]) => key);
+
+      if (validEntryKeys.length === 0) {
+        // No matching entries
+      } else {
+        // Extract tids for filtering
+        const validTids = [...new Set(validEntryKeys.map(k => k.split('_')[0]))];
+
+        // Fetch tournament_entries for these tids within date range
+        const { data: liveEntries } = await supabase
+          .from('tournament_entries')
+          .select(`
+            player_id,
+            players!inner(player_name, openskill_elo),
+            wins,
+            losses,
+            draws,
+            standing,
+            tournaments!inner(tid, total_players, start_date, top_cut)
+          `)
+          .in('tournaments.tid', validTids)
+          .gte('tournaments.start_date', dateRange.start)
+          .lte('tournaments.start_date', dateRange.end)
+          .gte('tournaments.total_players', minSize)
+          .limit(10000);
+
+        // Filter to only entries with matching commander pair
+        const matchingEntries = (liveEntries || []).filter((e: any) => {
+          const key = `${e.tournaments.tid}_${e.player_id}`;
+          return validEntryKeys.includes(key);
+        });
+
+      // Aggregate by player
+      const playerStats: Record<string, any> = {};
+      for (const entry of matchingEntries) {
+        const pid = entry.player_id;
+        const player = entry.players as any;
+        const tournament = entry.tournaments as any;
+
+        if (!playerStats[pid]) {
+          playerStats[pid] = {
+            player_id: pid,
+            player_name: player.player_name,
+            openskill_elo: player.openskill_elo,
+            entries: 0,
+            total_wins: 0,
+            total_losses: 0,
+            total_draws: 0,
+            conversions: 0,
+            top4s: 0,
+            championships: 0,
+            placement_sum: 0
+          };
+        }
+
+        const ps = playerStats[pid];
+        ps.entries++;
+        ps.total_wins += entry.wins || 0;
+        ps.total_losses += entry.losses || 0;
+        ps.total_draws += entry.draws || 0;
+
+        const topCut = tournament.top_cut || Math.ceil(tournament.total_players / 4);
+        if (entry.standing <= topCut) ps.conversions++;
+        if (entry.standing <= 4) ps.top4s++;
+        if (entry.standing === 1) ps.championships++;
+
+        ps.placement_sum += (entry.standing / tournament.total_players) * 100;
+      }
+
+      // Calculate rates and filter by minEntries
+      const allPilots = Object.values(playerStats)
+        .filter((p: any) => p.entries >= minEntries)
+        .map((p: any) => {
+          const totalGames = p.total_wins + p.total_losses + p.total_draws;
+          const winRate = totalGames > 0 ? p.total_wins / totalGames : 0;
+          const drawRate = totalGames > 0 ? p.total_draws / totalGames : 0;
+          const convRate = p.entries > 0 ? p.conversions / p.entries : 0;
+          const top4Rate = p.entries > 0 ? p.top4s / p.entries : 0;
+          const champRate = p.entries > 0 ? p.championships / p.entries : 0;
+
+          return {
+            ...p,
+            win_rate: winRate,
+            five_swiss: (winRate * 5) + (drawRate * 1),
+            conversion_rate: convRate,
+            top4_rate: top4Rate,
+            champ_rate: champRate,
+            conv_vs_expected: (convRate - 0.25) * 100,
+            top4_vs_expected: (top4Rate - 0.25) * 100,
+            champ_vs_expected: (champRate - 0.25) * 100,
+            avg_placement_pct: p.entries > 0 ? p.placement_sum / p.entries : 0,
+            tournaments: []
+          };
+        });
+
+      // Sort
+      const sortKey = sortColumn === 'player_name' ? 'player_name' :
+                      sortColumn === 'openskill_elo' ? 'openskill_elo' :
+                      sortColumn === 'avg_placement_pct' ? 'avg_placement_pct' :
+                      sortColumn;
+      allPilots.sort((a: any, b: any) => {
+        const aVal = a[sortKey] ?? 0;
+        const bVal = b[sortKey] ?? 0;
+        if (sortOrder === 'asc') return aVal > bVal ? 1 : -1;
+        return aVal < bVal ? 1 : -1;
+      });
+
+        totalPilots = allPilots.length;
+        totalPages = Math.ceil(totalPilots / perPage);
+        allPilotsForSummary = allPilots;
+        const offset = (page - 1) * perPage;
+        pilots = allPilots.slice(offset, offset + perPage);
+      }
+    }
   }
 
   // Get commander summary stats directly from commander_stats table
@@ -258,9 +418,45 @@ export const load: PageServerLoad = async ({ params, url }) => {
         champ_vs_expected: Number(statsData.champ_vs_expected) || 0
       };
     }
+  } else if (allPilotsForSummary.length > 0) {
+    // Calculate summary from live pilot data
+    const totals = allPilotsForSummary.reduce((acc, p) => ({
+      entries: acc.entries + p.entries,
+      total_wins: acc.total_wins + p.total_wins,
+      total_losses: acc.total_losses + p.total_losses,
+      total_draws: acc.total_draws + p.total_draws,
+      conversions: acc.conversions + p.conversions,
+      top4s: acc.top4s + (p.top4s || 0),
+      championships: acc.championships + (p.championships || 0)
+    }), { entries: 0, total_wins: 0, total_losses: 0, total_draws: 0, conversions: 0, top4s: 0, championships: 0 });
+
+    const totalGames = totals.total_wins + totals.total_losses + totals.total_draws;
+    const winRate = totalGames > 0 ? totals.total_wins / totalGames : 0;
+    const convRate = totals.entries > 0 ? totals.conversions / totals.entries : 0;
+    const top4Rate = totals.entries > 0 ? totals.top4s / totals.entries : 0;
+    const champRate = totals.entries > 0 ? totals.championships / totals.entries : 0;
+
+    summary = {
+      commander_pair: commanderName,
+      entries: totals.entries,
+      unique_pilots: totalPilots,
+      total_wins: totals.total_wins,
+      total_losses: totals.total_losses,
+      total_draws: totals.total_draws,
+      win_rate: winRate,
+      conversions: totals.conversions,
+      conversion_rate: convRate,
+      top4s: totals.top4s,
+      top4_rate: top4Rate,
+      championships: totals.championships,
+      champ_rate: champRate,
+      conv_vs_expected: (convRate - 0.25) * 100,
+      top4_vs_expected: (top4Rate - 0.25) * 100,
+      champ_vs_expected: (champRate - 0.25) * 100
+    };
   }
 
-  if (!summary && pilots.length === 0) {
+  if (!summary && pilots.length === 0 && allPilotsForSummary.length === 0) {
     throw error(404, 'Commander not found');
   }
 
@@ -278,6 +474,7 @@ export const load: PageServerLoad = async ({ params, url }) => {
     colorIdentity,
     cardImages,
     minSize,
+    minEntries,
     period,
     page,
     perPage,
@@ -370,6 +567,7 @@ async function getWeeklyTrends(commanderName: string, minSize: number, dataType:
   const allWeeks: Date[] = [];
   let currentWeek = getWeekMonday(effectiveStartDate);
   const endWeek = getWeekMonday(now);
+  endWeek.setDate(endWeek.getDate() - 7);
 
   while (currentWeek <= endWeek) {
     allWeeks.push(new Date(currentWeek));
@@ -495,7 +693,7 @@ async function getMonthlyTrends(commanderName: string, minSize: number, dataType
 
   const allMonths: Date[] = [];
   let currentMonth = new Date(effectiveStartDate.getFullYear(), effectiveStartDate.getMonth(), 1);
-  const endMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
 
   while (currentMonth <= endMonth) {
     allMonths.push(new Date(currentMonth));

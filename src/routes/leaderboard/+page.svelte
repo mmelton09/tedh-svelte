@@ -10,6 +10,7 @@
   let sortAsc = $state(false);
   let currentPage = $state(1);
   let perPage = $state(100);
+  let showMethodology = $state(false);
 
   // Date range state
   let dateStart = $state(data.periodStart || '');
@@ -481,13 +482,55 @@
   AvgX% = Average placement percentile (100% = always 1st)
 </div>
 
-<!-- ELO Methodology -->
+<!-- ELO Methodology Link -->
 <div class="methodology">
-  <strong>ELO Methodology:</strong>
-  Rankings use <a href="https://openskill.me" target="_blank" rel="noopener">OpenSkill</a> (Plackett-Luce model) calculated from pod results in 30+ player tournaments with complete match data.
-  Each pod is treated as a 4-player free-for-all where the winner places 1st and others tie for 2nd.
-  New players start at 1500. Only "ranked" games (tournaments with complete pod data) affect ELO.
+  <button class="methodology-link" onclick={() => showMethodology = true}>ELO Methodology &amp; Testing History</button>
 </div>
+
+<!-- Methodology Modal -->
+{#if showMethodology}
+  <div class="modal-backdrop" onclick={() => showMethodology = false} role="presentation">
+    <div class="modal-content" onclick={(e) => e.stopPropagation()}>
+      <button class="modal-close" onclick={() => showMethodology = false}>&#x2715;</button>
+      <h2>ELO Methodology</h2>
+
+      <section>
+        <h3>Rating System</h3>
+        <p>Rankings use <a href="https://openskill.me" target="_blank" rel="noopener">OpenSkill</a> (Plackett-Luce model), a Bayesian rating system similar to TrueSkill but open-source and designed for multiplayer games.</p>
+      </section>
+
+      <section>
+        <h3>How It Works</h3>
+        <ul>
+          <li>Each tournament pod is treated as a 4-player free-for-all</li>
+          <li>The pod winner places 1st; all other players tie for 2nd</li>
+          <li>New players start at a rating of 1500</li>
+          <li>Only "ranked" games count -- tournaments with 30+ players and complete pod data</li>
+        </ul>
+      </section>
+
+      <section>
+        <h3>Why OpenSkill?</h3>
+        <ul>
+          <li>Designed for multiplayer (not just 1v1 like traditional Elo)</li>
+          <li>Handles variable pod sizes and partial information</li>
+          <li>Converges faster than Elo for new players</li>
+          <li>Accounts for rating uncertainty (confidence intervals)</li>
+        </ul>
+      </section>
+
+      <section>
+        <h3>Data Sources</h3>
+        <p>All tournament data is sourced from <a href="https://topdeck.gg" target="_blank" rel="noopener">TopDeck.gg</a> tournament results. Only tournaments with complete match/pod data are included in ELO calculations.</p>
+      </section>
+
+      <section>
+        <h3>Testing History</h3>
+        <p>This section will be updated with backtesting results, model comparisons, and rating system changelog as the methodology evolves.</p>
+      </section>
+    </div>
+  </div>
+{/if}
 
 {#if pagedPlayers.length === 0}
   <p class="empty-state">No players found matching your criteria.</p>
@@ -829,20 +872,101 @@
 
   .methodology {
     text-align: center;
-    color: var(--text-muted);
-    font-size: 0.85em;
     padding: 12px;
     margin: 10px 0;
-    background: var(--bg-secondary);
-    border-radius: 8px;
   }
 
-  .methodology strong {
+  .methodology-link {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.85em;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    transition: color 0.2s;
+  }
+
+  .methodology-link:hover {
+    color: var(--accent);
+  }
+
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .modal-content {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    max-width: 640px;
+    width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+    padding: 32px;
+    position: relative;
     color: var(--text-primary);
   }
 
-  .methodology a {
+  .modal-content h2 {
     color: var(--accent);
+    font-size: 1.4rem;
+    margin: 0 0 20px 0;
+  }
+
+  .modal-content h3 {
+    color: var(--text-primary);
+    font-size: 1rem;
+    margin: 20px 0 8px 0;
+  }
+
+  .modal-content p {
+    color: var(--text-muted);
+    font-size: 0.9em;
+    line-height: 1.6;
+    margin: 0 0 8px 0;
+  }
+
+  .modal-content ul {
+    color: var(--text-muted);
+    font-size: 0.9em;
+    line-height: 1.6;
+    padding-left: 20px;
+    margin: 0 0 8px 0;
+  }
+
+  .modal-content a {
+    color: var(--accent);
+  }
+
+  .modal-content section {
+    margin-bottom: 12px;
+  }
+
+  .modal-close {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.2s;
+  }
+
+  .modal-close:hover {
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
   }
 
   .empty-state {

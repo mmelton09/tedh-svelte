@@ -821,6 +821,20 @@
         <input type="checkbox" bind:checked={showVsExpected}>
         ±Exp
       </label>
+      <span class="entries-filter">
+        Min Entries:
+        <select
+          class="size-select"
+          value={String(data.minEntries)}
+          onchange={(e) => updateParams({ min_entries: parseInt(e.currentTarget.value) || 1, page: 1 })}
+        >
+          <option value="1">1+</option>
+          <option value="2">2+</option>
+          <option value="3">3+</option>
+          <option value="5">5+</option>
+          <option value="10">10+</option>
+        </select>
+      </span>
       <span class="pilot-count">{data.totalPilots} pilots</span>
     </div>
   </div>
@@ -1400,6 +1414,14 @@
     align-items: center;
     gap: 0.25rem;
     cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .entries-filter {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
     font-size: 0.85rem;
     color: var(--text-muted);
   }
