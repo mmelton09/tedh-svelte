@@ -97,8 +97,14 @@
     return d.toLocaleDateString('en-US', { month: 'short' });
   }
 
-  // Only precalculated periods to avoid expensive live queries
   const periodGroups = {
+    recent: [
+      { value: 'last_week', label: 'Last Week' }
+    ],
+    months: [
+      { value: 'current_month', label: getCurrentMonthLabel() },
+      { value: 'prev_month', label: getPrevMonthLabel(1) }
+    ],
     rolling: [
       { value: '1m', label: '30d' },
       { value: '3m', label: '3mo' },
@@ -190,6 +196,26 @@
 
 <!-- Period Toggle -->
 <div class="period-toggle">
+  <span class="period-group">
+    {#each periodGroups.recent as p}
+      <button
+        class="period-btn"
+        class:active={data.period === p.value}
+        onclick={() => updatePeriod(p.value)}
+      >{p.label}</button>
+    {/each}
+  </span>
+  <span class="period-separator">|</span>
+  <span class="period-group">
+    {#each periodGroups.months as p}
+      <button
+        class="period-btn"
+        class:active={data.period === p.value}
+        onclick={() => updatePeriod(p.value)}
+      >{p.label}</button>
+    {/each}
+  </span>
+  <span class="period-separator">|</span>
   <span class="period-group">
     {#each periodGroups.rolling as p}
       <button
