@@ -345,18 +345,9 @@
   );
 
   // Period options for toggles
+  // NOTE: Only precalculated periods to avoid expensive live queries
+  // Live periods (this_weekend, last_week, current_month, etc.) removed to reduce disk I/O
   const periodGroups = {
-    live: [
-      { value: 'this_weekend', label: 'This Wknd' }
-    ],
-    recent: [
-      { value: 'last_week', label: 'Last Week' }
-    ],
-    months: [
-      { value: 'prev_month_2', label: getPrevMonthLabel(2) },
-      { value: 'prev_month', label: getPrevMonthLabel(1) },
-      { value: 'current_month', label: getCurrentMonthLabel() }
-    ],
     rolling: [
       { value: '1m', label: '30d' },
       { value: '3m', label: '3mo' },
@@ -377,11 +368,6 @@
     const d = new Date();
     d.setMonth(d.getMonth() - offset);
     return d.toLocaleDateString('en-US', { month: 'short' });
-  }
-
-  function isWeekend(): boolean {
-    const day = new Date().getDay();
-    return day === 0 || day === 5 || day === 6; // Sun, Fri, Sat
   }
 
   // Handle server-side filter changes (period, min_size)
@@ -645,38 +631,6 @@
 
 <!-- Time Period Toggle -->
 <div class="period-toggle">
-  {#if isWeekend()}
-  <span class="period-group live-group">
-    {#each periodGroups.live as p}
-      <button
-        class="period-btn period-btn-live"
-        class:active={data.period === p.value}
-        onclick={() => updatePeriod(p.value)}
-      >{p.label}</button>
-    {/each}
-  </span>
-  <span class="period-separator">|</span>
-  {/if}
-  <span class="period-group">
-    {#each periodGroups.months as p}
-      <button
-        class="period-btn"
-        class:active={data.period === p.value}
-        onclick={() => updatePeriod(p.value)}
-      >{p.label}</button>
-    {/each}
-  </span>
-  <span class="period-separator">|</span>
-  <span class="period-group">
-    {#each periodGroups.recent as p}
-      <button
-        class="period-btn"
-        class:active={data.period === p.value}
-        onclick={() => updatePeriod(p.value)}
-      >{p.label}</button>
-    {/each}
-  </span>
-  <span class="period-separator">|</span>
   <span class="period-group">
     {#each periodGroups.rolling as p}
       <button
