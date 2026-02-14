@@ -1003,6 +1003,7 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     cursor: zoom-in;
     transition: transform 0.2s ease, z-index 0s;
+    transform-origin: top left;
   }
 
   .commander-card-img:hover {

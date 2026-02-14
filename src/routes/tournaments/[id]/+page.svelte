@@ -8,7 +8,7 @@
   let expandedRows = $state<Set<number>>(new Set());
 
   // Sorting state
-  let sortCol = $state<'standing' | 'player' | 'commander' | 'record'>('standing');
+  let sortCol = $state<'standing' | 'player' | 'elo' | 'commander' | 'record'>('standing');
   let sortAsc = $state(true);
 
   function toggleSort(col: typeof sortCol) {
@@ -30,6 +30,9 @@
           break;
         case 'player':
           cmp = getPlayerName(a).localeCompare(getPlayerName(b));
+          break;
+        case 'elo':
+          cmp = (getPlayerElo(b) || 0) - (getPlayerElo(a) || 0); // Higher ELO first
           break;
         case 'commander':
           cmp = getCommanderPair(a).localeCompare(getCommanderPair(b));
@@ -318,6 +321,9 @@
         <th class="sortable" class:sorted={sortCol === 'player'} onclick={() => toggleSort('player')}>
           Player {sortCol === 'player' ? (sortAsc ? '▲' : '▼') : ''}
         </th>
+        <th class="metric sortable elo-col" class:sorted={sortCol === 'elo'} onclick={() => toggleSort('elo')}>
+          ELO {sortCol === 'elo' ? (sortAsc ? '▲' : '▼') : ''}
+        </th>
         <th class="colors-col"></th>
         <th class="sortable" class:sorted={sortCol === 'commander'} onclick={() => toggleSort('commander')}>
           Commander {sortCol === 'commander' ? (sortAsc ? '▲' : '▼') : ''}
@@ -350,6 +356,7 @@
               {getPlayerName(entry)}
             </a>
           </td>
+          <td class="metric elo-col">{getPlayerElo(entry) ? Math.round(getPlayerElo(entry)!) : '-'}</td>
           <td class="colors-col">
             {#each getCommanderColorIdentity(entry) as color}
               <i class="ms ms-{color.toLowerCase()} ms-cost"></i>
@@ -375,7 +382,7 @@
           {@const playerId = getPlayerId(entry)}
           {@const matches = data.playerMatches?.[playerId] || []}
           <tr class="expanded-row">
-            <td colspan="6">
+            <td colspan="7">
               <div class="expanded-content">
                 {#if matches.length > 0}
                   <table class="pairings-table">
