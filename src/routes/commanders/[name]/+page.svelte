@@ -1001,6 +1001,14 @@
     height: auto;
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    cursor: zoom-in;
+    transition: transform 0.2s ease, z-index 0s;
+  }
+
+  .commander-card-img:hover {
+    transform: scale(2.5);
+    z-index: 100;
+    position: relative;
   }
 
   .header-chart-container {
