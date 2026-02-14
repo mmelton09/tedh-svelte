@@ -16,7 +16,7 @@
       sortAsc = !sortAsc;
     } else {
       sortCol = col;
-      sortAsc = col === 'standing'; // Default asc for standing, desc for others
+      sortAsc = col === 'standing' || col === 'elo'; // Default asc for standing/elo, desc for others
     }
   }
 
