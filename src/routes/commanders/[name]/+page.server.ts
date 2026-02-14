@@ -39,6 +39,11 @@ const PRECALC_PERIODS: Record<string, string> = {
   '1m': '1m',
   '30d': '1m',
   'post_ban': 'post_ban',
+  'last_week': 'last_week',
+  'current_month': 'current_month',
+  'prev_month': 'prev_month',
+  'prev_month_2': 'prev_month_2',
+  'this_weekend': 'this_weekend',
 };
 
 // Valid min sizes in precalc table

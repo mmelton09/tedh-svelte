@@ -22,6 +22,11 @@ const PRECALC_PERIODS: Record<string, string> = {
   '3m': '3m',
   '1m': '1m',
   'post_ban': 'post_ban',
+  'last_week': 'last_week',
+  'current_month': 'current_month',
+  'prev_month': 'prev_month',
+  'prev_month_2': 'prev_month_2',
+  'this_weekend': 'this_weekend',
 };
 
 // Map periods to their comparison periods for delta calculation
