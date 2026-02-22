@@ -3,28 +3,34 @@ import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
 
 // Fetch card images from Scryfall API
-async function getCardImages(cardName: string): Promise<{ art: string | null; full: string | null }> {
+// Returns array of faces (for transform/DFC cards, returns both faces)
+async function getCardImages(cardName: string): Promise<Array<{ name: string; art: string | null; full: string | null }>> {
   try {
     const response = await fetch(
       `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(cardName)}`
     );
-    if (!response.ok) return { art: null, full: null };
+    if (!response.ok) return [{ name: cardName, art: null, full: null }];
     const data = await response.json();
 
-    // Handle double-faced cards
-    if (data.card_faces && data.card_faces[0]?.image_uris) {
-      return {
-        art: data.card_faces[0].image_uris?.art_crop || data.card_faces[0].image_uris?.normal || null,
-        full: data.card_faces[0].image_uris?.large || data.card_faces[0].image_uris?.normal || null
-      };
+    // Handle transform/modal DFC cards - return both faces
+    if (data.layout === 'transform' || data.layout === 'modal_dfc') {
+      if (data.card_faces && data.card_faces.length >= 2) {
+        return data.card_faces.map((face: any) => ({
+          name: face.name,
+          art: face.image_uris?.art_crop || face.image_uris?.normal || null,
+          full: face.image_uris?.large || face.image_uris?.normal || null
+        }));
+      }
     }
 
-    return {
+    // Regular cards
+    return [{
+      name: cardName,
       art: data.image_uris?.art_crop || data.image_uris?.normal || null,
       full: data.image_uris?.large || data.image_uris?.normal || null
-    };
+    }];
   } catch {
-    return { art: null, full: null };
+    return [{ name: cardName, art: null, full: null }];
   }
 }
 
@@ -141,12 +147,10 @@ export const load: PageServerLoad = async ({ params, url }) => {
   const names = commanderName.split(' / ').map(n => n.trim());
 
   // Fetch card images from Scryfall (in parallel)
+  // getCardImages returns array of faces (for transform cards, both faces)
   const cardImagesPromise = Promise.all(
-    names.map(async (name) => {
-      const images = await getCardImages(name);
-      return { name, art: images.art, full: images.full };
-    })
-  );
+    names.map(async (name) => getCardImages(name))
+  ).then(results => results.flat());
 
   // Get color identity from commanders table
   const colorIdentityPromise = (async () => {
